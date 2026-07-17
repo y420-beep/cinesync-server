@@ -27,12 +27,14 @@ input:focus{border-color:#e50914}
 
 #main{flex:1;display:flex;flex-direction:column;position:relative}
 
+/* Видео контейнер */
 #vbox{flex:1;display:flex;align-items:center;justify-content:center;position:relative;background:#000;overflow:hidden}
 video{width:100%;height:100%;object-fit:contain;max-height:70vh;background:#000}
 #ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#666;z-index:5}
 #ph .ic{font-size:64px;margin-bottom:16px;display:block}
 
-#fs-btn{position:absolute;top:max(12px,env(safe-area-inset-top));right:12px;width:44px;height:44px;border-radius:12px;background:rgba(0,0,0,.6);backdrop-filter:blur(10px);border:none;color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;z-index:20;-webkit-appearance:none}
+/* Полноэкран через нативный video на iOS */
+video::-webkit-media-controls-fullscreen-button{display:block!important}
 
 #badge{position:absolute;top:max(12px,env(safe-area-inset-top));left:12px;display:flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(0,0,0,.6);backdrop-filter:blur(10px);border-radius:20px;font-size:12px;z-index:20}
 .dot{width:8px;height:8px;border-radius:50%;background:#00ff88;animation:pulse 2s infinite}
@@ -44,13 +46,13 @@ video{width:100%;height:100%;object-fit:contain;max-height:70vh;background:#000}
 .pv{width:40px;height:4px;background:rgba(255,255,255,.2);border-radius:2px;overflow:hidden}
 .pvf{height:100%;background:#00ff88;width:0%;transition:.1s}
 
-/* URL панель - скрыта по умолчанию */
-#url-bar{position:absolute;bottom:220px;left:16px;right:16px;background:rgba(10,10,15,.95);backdrop-filter:blur(20px);padding:16px;border-radius:20px;transform:translateY(300%);transition:.3s;z-index:100;display:flex;gap:8px;border:1px solid #1a1a2e}
+/* URL панель - скрыта */
+#url-bar{position:absolute;bottom:200px;left:16px;right:16px;background:rgba(10,10,15,.95);backdrop-filter:blur(20px);padding:16px;border-radius:20px;transform:translateY(500px);transition:.3s;z-index:100;display:flex;gap:8px;border:1px solid #1a1a2e}
 #url-bar.on{transform:translateY(0)}
 #url-bar input{flex:1;margin:0}
 
-/* Настройки звука - скрыты по умолчанию */
-#aset{position:absolute;bottom:220px;left:16px;right:16px;background:rgba(10,10,15,.95);backdrop-filter:blur(20px);padding:20px;border-radius:20px;transform:translateY(300%);transition:.3s;z-index:100;border:1px solid #1a1a2e}
+/* Настройки звука - скрыта */
+#aset{position:absolute;bottom:200px;left:16px;right:16px;background:rgba(10,10,15,.95);backdrop-filter:blur(20px);padding:20px;border-radius:20px;transform:translateY(500px);transition:.3s;z-index:100;border:1px solid #1a1a2e}
 #aset.on{transform:translateY(0)}
 .sl{margin-bottom:16px}
 .sl label{display:flex;justify-content:space-between;font-size:13px;color:#888;margin-bottom:8px}
@@ -80,9 +82,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
 .toast{background:#1a1a2e;padding:14px 24px;border-radius:16px;font-size:15px;border-left:4px solid #e50914;animation:ti .3s;max-width:320px;text-align:center;font-weight:500}
 @keyframes ti{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 
-/* Скрытие UI */
-.hid #ctrl,.hid #badge,.hid #peers,.hid #fs-btn{opacity:0;pointer-events:none}
-.hid #url-bar,.hid #aset{transform:translateY(300%)!important}
+.hid #ctrl,.hid #badge,.hid #peers{opacity:0;pointer-events:none}
 </style>
 </head>
 <body>
@@ -101,8 +101,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
 <div id="main" class="hidden">
 <div id="vbox">
 <div id="ph"><span class="ic">🎬</span><div>Нажмите 🔗 чтобы загрузить видео</div></div>
-<video id="vid" playsinline webkit-playsinline preload="metadata" style="display:none"></video>
-<button id="fs-btn" onclick="tf()">⛶</button>
+<video id="vid" playsinline controls preload="metadata" style="display:none"></video>
 </div>
 
 <div id="badge"><div class="dot"></div><span id="bt">Подключено</span></div>
@@ -137,7 +136,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
 <div id="toast-c"></div>
 
 <script>
-let ws,pc,dc,ls,room,myName='',isHost=false,isPlaying=false,isMicOn=false,audioCtx,vg,ag,mg;
+let ws,pc,dc,ls,room,myName='',isHost=false,isPlaying=false,isMicOn=false,audioCtx,ag,mg;
 let videoEl = null;
 const WS_URL=(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';
 
@@ -232,7 +231,6 @@ function load(){
     const v=$('vid');
     videoEl=v;
     
-    // Сбрасываем
     v.pause();
     v.removeAttribute('src');
     v.load();
@@ -243,13 +241,8 @@ function load(){
     v.oncanplay=()=>{
         $('ph').style.display='none';
         v.style.display='block';
-        $('fs-btn').style.display='flex';
-        
-        // Звук
         v.muted=false;
         v.volume=0.6;
-        
-        setupVideoAudio();
         toast('Видео готово! Нажмите ▶️');
     };
     
@@ -259,7 +252,7 @@ function load(){
         if(v.error){
             switch(v.error.code){
                 case 1:msg='Прервано загрузкой';break;
-                case 2:msg='Ошибка сети. Проверьте URL';break;
+                case 2:msg='Ошибка сети';break;
                 case 3:msg='Формат не поддерживается';break;
                 case 4:msg='Невозможно воспроизвести';break;
             }
@@ -267,28 +260,7 @@ function load(){
         toast(msg);
     };
     
-    // Закрываем панель URL
     $('url-bar').classList.remove('on');
-}
-
-function setupVideoAudio(){
-    if(!videoEl)return;
-    try{
-        if(!audioCtx){
-            audioCtx=new(window.AudioContext||webkitAudioContext)();
-            mg=audioCtx.createGain();mg.connect(audioCtx.destination);
-        }
-        // Не подключаем MediaElementSource повторно
-        if(!vg){
-            const s=audioCtx.createMediaElementSource(videoEl);
-            vg=audioCtx.createGain();vg.gain.value=.6;
-            s.connect(vg);vg.connect(mg);
-        }
-        videoEl.muted=false;
-        videoEl.volume=1;
-    }catch(e){
-        videoEl.volume=.6;
-    }
 }
 
 function tp(){
@@ -313,22 +285,6 @@ function tp(){
     }
 }
 
-// Клик на видео для iOS
-$('vid').addEventListener('click',function(){
-    if(!this.src)return;
-    if(this.paused){
-        this.play().then(()=>{
-            isPlaying=true;$('pb').textContent='⏸';
-            sendSync('play',this.currentTime);
-        }).catch(()=>{});
-    }else{
-        this.pause();
-        isPlaying=false;$('pb').textContent='▶️';
-        sendSync('pause',this.currentTime);
-    }
-});
-
-// Прогресс бар
 $('prog-bar').addEventListener('click',function(e){
     if(!videoEl||!videoEl.duration)return;
     const r=this.getBoundingClientRect();
@@ -363,37 +319,8 @@ function applySync(m){
     }
 }
 
-// URL панель - toggle
-function tu(){
-    $('url-bar').classList.toggle('on');
-    // Закрываем настройки если открыты
-    $('aset').classList.remove('on');
-}
-
-// Настройки звука - toggle
-function ta(){
-    $('aset').classList.toggle('on');
-    // Закрываем URL если открыт
-    $('url-bar').classList.remove('on');
-}
-
-// Полноэкран
-function tf(){
-    const el=$('vbox');
-    if(!document.fullscreenElement){
-        if(el.requestFullscreen){
-            el.requestFullscreen().catch(()=>{});
-        }else if(el.webkitRequestFullscreen){
-            el.webkitRequestFullscreen();
-        }
-    }else{
-        if(document.exitFullscreen){
-            document.exitFullscreen();
-        }else if(document.webkitExitFullscreen){
-            document.webkitExitFullscreen();
-        }
-    }
-}
+function tu(){$('url-bar').classList.toggle('on');$('aset').classList.remove('on');}
+function ta(){$('aset').classList.toggle('on');$('url-bar').classList.remove('on');}
 
 async function tmic(){
     const b=$('mb');
@@ -401,10 +328,9 @@ async function tmic(){
     else{isMicOn=!isMicOn;ls.getAudioTracks().forEach(t=>t.enabled=isMicOn);b.classList.toggle('on',isMicOn);toast(isMicOn?'🎤 Микрофон вкл':'🔇 Микрофон выкл');}
 }
 
-function svv(v){const val=v/100;$('vv').textContent=v+'%';if(vg)vg.gain.value=val;else if(videoEl)videoEl.volume=val;}
+function svv(v){const val=v/100;$('vv').textContent=v+'%';if(videoEl)videoEl.volume=val;}
 function sav(v){const val=v/100;$('av').textContent=v+'%';if(ag)ag.gain.value=val;}
 
-// Обновление прогресса
 setInterval(()=>{
     if(videoEl&&videoEl.duration){
         $('pf').style.width=(videoEl.currentTime/videoEl.duration*100)+'%';
@@ -412,20 +338,9 @@ setInterval(()=>{
     }
 },200);
 
-// Авто-скрытие UI
 let hideTimer;
-function rst(){
-    document.body.classList.remove('hid');
-    clearTimeout(hideTimer);
-    if(isPlaying)hideTimer=setTimeout(()=>document.body.classList.add('hid'),4000);
-}
-document.addEventListener('click',rst);
-document.addEventListener('touchstart',rst);
-
-// Не скрывать при клике на панели
-$('url-bar').addEventListener('click',(e)=>e.stopPropagation());
-$('aset').addEventListener('click',(e)=>e.stopPropagation());
-$('ctrl').addEventListener('click',(e)=>e.stopPropagation());
+function rst(){document.body.classList.remove('hid');clearTimeout(hideTimer);if(isPlaying)hideTimer=setTimeout(()=>document.body.classList.add('hid'),4000);}
+document.addEventListener('click',rst);document.addEventListener('touchstart',rst);
 
 if('wakeLock' in navigator){
     navigator.wakeLock.request('screen').catch(()=>{});
