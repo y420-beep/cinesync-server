@@ -1,554 +1,329 @@
-// ==================== КОНФИГУРАЦИЯ ====================
-const WS_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
+const express = require('express');
+const { createServer } = require('http');
+const { WebSocketServer } = require('ws');
+const fs = require('fs');
 
-// ==================== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ====================
-let ws = null;
-let pc = null;
-let dc = null;
-let localStream = null;
-let room = null;
-let myName = '';
-let isHost = false;
-let isPlaying = false;
-let isMicOn = false;
-let audioCtx = null;
-let videoGain = null;
-let voiceGain = null;
-let masterGain = null;
-let syncTimer = null;
-let pendingPlay = false; // Ожидаем ручного запуска
+const app = express();
+const server = createServer(app);
 
-// ==================== УТИЛИТЫ ====================
-function $(id) { return document.getElementById(id); }
+// Создаём папку public
+if (!fs.existsSync('public')) fs.mkdirSync('public');
 
-function toast(msg, duration = 3000) {
-    const c = $('toast-c');
-    // Удаляем старые тосты чтобы не дублировались
-    while (c.children.length > 2) c.removeChild(c.firstChild);
-    const t = document.createElement('div');
-    t.className = 'toast';
-    t.textContent = msg;
-    c.appendChild(t);
-    setTimeout(() => t.remove(), duration);
+// HTML файл
+const html = `<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0f">
+<title>CineSync</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0f;color:#fff;height:100dvh;overflow:hidden}
+.hidden{display:none!important}
+#connect{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#0a0a0f,#1a1a2e)}
+.logo{font-size:48px;font-weight:800;background:linear-gradient(135deg,#e50914,#ff6b6b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.sub{color:#888;font-size:14px;margin-bottom:40px;text-align:center}
+input{width:100%;max-width:320px;padding:16px 20px;border:2px solid #1a1a2e;border-radius:16px;background:#1a1a2e;color:#fff;font-size:16px;margin-bottom:12px;outline:none;-webkit-appearance:none}
+input:focus{border-color:#e50914}
+.btn{width:100%;max-width:320px;padding:18px;border:none;border-radius:16px;font-size:16px;font-weight:600;cursor:pointer;-webkit-appearance:none}
+.btn-red{background:#e50914;color:#fff}
+.btn-dark{background:#1a1a2e;color:#fff;margin-top:8px}
+.status{margin-top:16px;padding:12px 20px;border-radius:12px;font-size:14px;max-width:320px;width:100%;text-align:center}
+.ok{background:rgba(0,255,136,.1);color:#00ff88;border:1px solid rgba(0,255,136,.2)}
+.wait{background:rgba(0,212,255,.1);color:#00d4ff;border:1px solid rgba(0,212,255,.2)}
+.err{background:rgba(229,9,20,.1);color:#e50914;border:1px solid rgba(229,9,20,.2)}
+#main{flex:1;display:flex;flex-direction:column;position:relative}
+#vbox{flex:1;background:#000;display:flex;align-items:center;justify-content:center;position:relative}
+video{width:100%;height:100%;object-fit:contain}
+#ph{text-align:center;padding:20px;color:#666}
+#ph .ic{font-size:64px;margin-bottom:16px;display:block}
+#ubar{position:absolute;top:0;left:0;right:0;background:rgba(10,10,15,.95);padding:16px;padding-top:max(16px,env(safe-area-inset-top));transform:translateY(-100%);transition:.3s;z-index:100;display:flex;gap:8px}
+#ubar.on{transform:translateY(0)}
+#ubar input{flex:1;margin:0}
+#badge{position:absolute;top:max(16px,env(safe-area-inset-top));right:16px;display:flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(0,0,0,.6);backdrop-filter:blur(10px);border-radius:20px;font-size:12px;z-index:50}
+.dot{width:8px;height:8px;border-radius:50%;background:#00ff88;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+#peers{position:absolute;top:max(60px,env(safe-area-inset-top)+44px);right:16px;display:flex;flex-direction:column;gap:8px;z-index:50}
+.peer{display:flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(0,0,0,.6);backdrop-filter:blur(10px);border-radius:20px;font-size:12px}
+.peer.talk{background:rgba(0,255,136,.2);border:1px solid #00ff88}
+.pv{width:40px;height:4px;background:rgba(255,255,255,.2);border-radius:2px;overflow:hidden}
+.pvf{height:100%;background:#00ff88;width:0%;transition:.1s}
+#aset{position:absolute;bottom:120px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(10,10,15,.95);padding:20px;border-radius:20px;width:90%;max-width:300px;opacity:0;pointer-events:none;transition:.3s;z-index:60}
+#aset.on{opacity:1;pointer-events:all;transform:translateX(-50%) translateY(0)}
+.sl{margin-bottom:16px}
+.sl label{display:flex;justify-content:space-between;font-size:13px;color:#888;margin-bottom:8px}
+.sl label span{color:#fff;font-weight:600}
+input[type=range]{width:100%;height:4px;background:#1a1a2e;border-radius:2px;outline:none;-webkit-appearance:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;background:#e50914;border-radius:50%;cursor:pointer}
+#ctrl{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,.9),transparent);padding:20px 16px 32px;padding-bottom:max(32px,env(safe-area-inset-bottom));transition:.3s}
+.row{display:flex;align-items:center;gap:16px;margin-bottom:12px}
+.cb{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;-webkit-appearance:none}
+.cb:active{background:rgba(255,255,255,.3)}
+.cb.big{width:56px;height:56px;font-size:24px}
+.cb.on{background:#e50914}
+.prog{flex:1;height:4px;background:rgba(255,255,255,.2);border-radius:2px;position:relative;cursor:pointer}
+.prog-f{height:100%;background:#e50914;border-radius:2px;width:0%}
+.tm{font-size:12px;color:rgba(255,255,255,.8);min-width:90px;text-align:right;font-variant-numeric:tabular-nums}
+#toast-c{position:fixed;top:max(80px,env(safe-area-inset-top)+60px);left:50%;transform:translateX(-50%);z-index:3000;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:#1a1a2e;padding:12px 20px;border-radius:12px;font-size:14px;border-left:3px solid #e50914;animation:ti .3s;max-width:300px;text-align:center}
+@keyframes ti{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.hid #ctrl,.hid #badge,.hid #peers{opacity:0;pointer-events:none}
+.hid #ubar{transform:translateY(-100%)}
+</style>
+</head>
+<body>
+
+<div id="connect">
+<div class="logo">CineSync</div>
+<div class="sub">Смотрите фильмы вместе</div>
+<input type="text" id="un" placeholder="Ваше имя" maxlength="20">
+<input type="text" id="rc" placeholder="Код комнаты" maxlength="6">
+<button class="btn btn-red" onclick="join()">Присоединиться</button>
+<div style="margin:8px 0;color:#555">или</div>
+<button class="btn btn-dark" onclick="create()">Создать комнату</button>
+<div id="st" class="hidden"></div>
+</div>
+
+<div id="main" class="hidden">
+<div id="vbox">
+<video id="vid" playsinline preload="metadata" style="display:none"></video>
+<div id="ph"><span class="ic">🎬</span><div>Нажмите 🔗 для видео</div></div>
+</div>
+<div id="ubar"><input type="text" id="vu" placeholder="URL видео (MP4/WebM)"><button class="btn btn-red" style="width:auto;padding:12px 20px;font-size:14px" onclick="load()">▶️</button></div>
+<div id="badge"><div class="dot"></div><span id="bt">Подключено</span></div>
+<div id="peers"></div>
+<div id="aset">
+<div class="sl"><label>Фильм <span id="vv">60%</span></label><input type="range" min="0" max="100" value="60" oninput="svv(this.value)"></div>
+<div class="sl"><label>Голос <span id="av">80%</span></label><input type="range" min="0" max="100" value="80" oninput="sav(this.value)"></div>
+</div>
+<div id="ctrl">
+<div class="row">
+<button class="cb big" id="pb" onclick="tp()">▶️</button>
+<div class="prog" onclick="sk(event)"><div class="prog-f" id="pf"></div></div>
+<div class="tm" id="tm">00:00 / 00:00</div>
+</div>
+<div class="row" style="justify-content:center;gap:24px">
+<button class="cb" onclick="tu()">🔗</button>
+<button class="cb" id="mb" onclick="tmic()">🎤</button>
+<button class="cb" onclick="ta()">🔊</button>
+<button class="cb" onclick="tf()">⛶</button>
+</div>
+</div>
+</div>
+
+<div id="toast-c"></div>
+
+<script>
+let ws,pc,dc,ls,room,myName='',isHost=false,isPlaying=false,isMicOn=false,audioCtx,vg,ag,mg;
+const WS_URL=(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';
+
+function $(id){return document.getElementById(id)}
+function toast(m){
+    const c=$('toast-c');
+    while(c.children.length>2)c.removeChild(c.firstChild);
+    const t=document.createElement('div');t.className='toast';t.textContent=m;c.appendChild(t);
+    setTimeout(()=>t.remove(),3000);
+}
+function showStatus(t,cls){
+    const s=$('st');s.textContent=t;s.className='status '+cls;s.classList.remove('hidden');
+}
+function genCode(){
+    const ch='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let c='';
+    for(let i=0;i<6;i++)c+=ch[Math.floor(Math.random()*ch.length)];return c;
+}
+function fmt(s){if(!isFinite(s))return'00:00';const m=Math.floor(s/60),sec=Math.floor(s%60);return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');}
+
+function create(){myName=$('un').value.trim()||'Я';room=genCode();isHost=true;showStatus('Создание...','wait');connect();}
+function join(){
+    myName=$('un').value.trim()||'Я';room=$('rc').value.trim().toUpperCase();
+    if(room.length!==6){toast('Код — 6 символов');return}
+    showStatus('Подключение...','wait');connect();
 }
 
-function showStatus(text, type) {
-    const s = $('st');
-    s.textContent = text;
-    s.className = 'status ' + type;
-    s.classList.remove('hidden');
-}
-
-function genCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
-    return code;
-}
-
-function fmtTime(s) {
-    if (!isFinite(s)) return '00:00';
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    return String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
-}
-
-// ==================== СОЗДАНИЕ/ПОДКЛЮЧЕНИЕ ====================
-function create() {
-    myName = $('un').value.trim() || 'Я';
-    room = genCode();
-    isHost = true;
-    showStatus('Создание комнаты...', 'wait');
-    connect();
-}
-
-function join() {
-    myName = $('un').value.trim() || 'Я';
-    room = $('rc').value.trim().toUpperCase();
-    if (room.length !== 6) {
-        toast('❌ Код — 6 символов');
-        return;
-    }
-    showStatus('Подключение...', 'wait');
-    connect();
-}
-
-// ==================== WEBSOCKET ====================
-function connect() {
-    ws = new WebSocket(WS_URL);
-
-    ws.onopen = () => {
-        ws.send(JSON.stringify({ type: 'join', room, name: myName }));
+function connect(){
+    ws=new WebSocket(WS_URL);
+    ws.onopen=()=>{ws.send(JSON.stringify({type:'join',room,name:myName}))};
+    ws.onmessage=(e)=>{
+        const m=JSON.parse(e.data);
+        if(m.type==='joined'){
+            $('connect').classList.add('hidden');$('main').classList.remove('hidden');
+            showStatus('Комната '+room,'ok');setTimeout(()=>$('st').classList.add('hidden'),2000);
+            if(m.peers)m.peers.forEach(p=>{if(p!==myName)addPeer(p)});
+            if(!isHost&&m.peers&&m.peers.length>1)initRTC(false);
+            toast(isHost?'Комната: '+room:'Подключено!');
+        }else if(m.type==='peer-joined'){toast(m.name+' подключился');addPeer(m.name);if(isHost)initRTC(true);}
+        else if(m.type==='peer-left'){toast(m.name+' вышел');document.querySelectorAll('.peer').forEach(el=>{if(el.dataset.n===m.name)el.remove()});}
+        else if(['offer','answer','ice-candidate'].includes(m.type))handleRTC(m);
+        else if(m.type==='sync')handleSync(m);
     };
-
-    ws.onmessage = (e) => {
-        const msg = JSON.parse(e.data);
-        handleMsg(msg);
-    };
-
-    ws.onerror = () => {
-        showStatus('Ошибка соединения. Перезагрузите.', 'err');
-    };
-
-    ws.onclose = () => {
-        $('bt').textContent = 'Отключено';
-        document.querySelector('.dot').style.background = '#e50914';
-        document.querySelector('.dot').style.animation = 'none';
-    };
+    ws.onerror=()=>showStatus('Ошибка','err');
 }
 
-function handleMsg(m) {
-    switch (m.type) {
-        case 'joined':
-            onJoined(m);
-            break;
-        case 'peer-joined':
-            onPeerJoined(m);
-            break;
-        case 'peer-left':
-            onPeerLeft(m);
-            break;
-        case 'offer':
-            handleOffer(m);
-            break;
-        case 'answer':
-            handleAnswer(m);
-            break;
-        case 'ice-candidate':
-            handleIce(m);
-            break;
-        case 'sync':
-            handleSync(m);
-            break;
-    }
-}
-
-function onJoined(m) {
-    $('connect').classList.add('hidden');
-    $('main').classList.remove('hidden');
-    showStatus('✅ Комната ' + room, 'ok');
-    setTimeout(() => $('st').classList.add('hidden'), 2000);
-
-    if (m.peers) {
-        m.peers.forEach(p => { if (p !== myName) addPeer(p); });
-    }
-
-    if (!isHost && m.peers && m.peers.length > 1) {
-        initRTC(false);
-    }
-
-    toast(isHost ? '🏠 Комната: ' + room : '✅ Подключено!');
-}
-
-function onPeerJoined(m) {
-    toast('🎉 ' + m.name + ' подключился');
-    addPeer(m.name);
-    if (isHost) initRTC(true);
-}
-
-function onPeerLeft(m) {
-    toast('👋 ' + m.name + ' вышел');
-    document.querySelectorAll('.peer').forEach(el => {
-        if (el.dataset.name === m.name) el.remove();
-    });
-}
-
-// ==================== PEER ИНДИКАТОРЫ ====================
-function addPeer(name) {
-    if (document.querySelector('.peer[data-name="' + name + '"]')) return;
-    const el = document.createElement('div');
-    el.className = 'peer';
-    el.dataset.name = name;
-    el.innerHTML = '<span>' + name + '</span><div class="pv"><div class="pvf"></div></div>';
+function addPeer(n){
+    if(document.querySelector('.peer[data-n="'+n+'"]'))return;
+    const el=document.createElement('div');el.className='peer';el.dataset.n=n;
+    el.innerHTML='<span>'+n+'</span><div class="pv"><div class="pvf"></div></div>';
     $('peers').appendChild(el);
 }
 
-// ==================== WEBRTC ====================
-async function initRTC(isInitiator) {
-    if (pc) return;
-
-    const config = {
-        iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' }
-        ]
-    };
-
-    pc = new RTCPeerConnection(config);
-
-    if (isInitiator) {
-        dc = pc.createDataChannel('sync', { ordered: true });
-        setupDC();
-    } else {
-        pc.ondatachannel = (e) => {
-            dc = e.channel;
-            setupDC();
-        };
-    }
-
-    try {
-        localStream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                echoCancellation: false,
-                noiseSuppression: true,
-                autoGainControl: false,
-                sampleRate: 48000
-            },
-            video: false
-        });
-
-        localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-        setupAudioMixing();
-
-    } catch (err) {
-        toast('⚠️ Разрешите доступ к микрофону');
-    }
-
-    pc.ontrack = (e) => {
-        const remoteStream = e.streams[0];
-        const audio = new Audio();
-        audio.srcObject = remoteStream;
-        audio.play().catch(() => {});
-    };
-
-    pc.onicecandidate = (e) => {
-        if (e.candidate && ws && ws.readyState === 1) {
-            ws.send(JSON.stringify({ type: 'ice-candidate', candidate: e.candidate }));
-        }
-    };
-
-    pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'connected') {
-            toast('🎤 Голосовая связь активна');
-        }
-    };
-
-    if (isInitiator) {
-        try {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            ws.send(JSON.stringify({ type: 'offer', sdp: offer }));
-        } catch (e) {
-            console.error('Offer error:', e);
-        }
-    }
+async function initRTC(init){
+    if(pc)return;
+    pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]});
+    if(init){dc=pc.createDataChannel('sync');setupDC()}else pc.ondatachannel=e=>{dc=e.channel;setupDC()};
+    try{
+        ls=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:false}});
+        ls.getTracks().forEach(t=>pc.addTrack(t,ls));setupAudio();
+    }catch(e){toast('Разрешите микрофон')}
+    pc.ontrack=e=>{const a=new Audio();a.srcObject=e.streams[0];a.play().catch(()=>{});};
+    pc.onicecandidate=e=>{if(e.candidate&&ws&&ws.readyState===1)ws.send(JSON.stringify({type:'ice-candidate',candidate:e.candidate}))};
+    pc.onconnectionstatechange=()=>{if(pc.connectionState==='connected')toast('Голос активен');};
+    if(init){const o=await pc.createOffer();await pc.setLocalDescription(o);ws.send(JSON.stringify({type:'offer',sdp:o}));}
 }
 
-function setupDC() {
-    dc.onopen = () => {
-        console.log('DataChannel открыт');
-        startSyncLoop();
-    };
-    dc.onmessage = (e) => {
-        const msg = JSON.parse(e.data);
-        applySync(msg);
-    };
+function setupDC(){
+    dc.onopen=()=>{setInterval(()=>{const v=$('vid');if(isPlaying&&v.currentTime)dc.send(JSON.stringify({type:'sync',t:v.currentTime,p:!v.paused}))},5000);};
+    dc.onmessage=e=>applySync(JSON.parse(e.data));
 }
 
-// ==================== АУДИО МИКШИРОВАНИЕ ====================
-function setupAudioMixing() {
-    if (!localStream) return;
-
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    masterGain = audioCtx.createGain();
-    masterGain.connect(audioCtx.destination);
-
-    const source = audioCtx.createMediaStreamSource(localStream);
-    voiceGain = audioCtx.createGain();
-    voiceGain.gain.value = 0.8;
-
-    const filter = audioCtx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.value = 1000;
-    filter.Q.value = 1;
-
-    source.connect(filter);
-    filter.connect(voiceGain);
-    voiceGain.connect(masterGain);
+function setupAudio(){
+    if(!ls)return;
+    audioCtx=new(window.AudioContext||webkitAudioContext)();
+    mg=audioCtx.createGain();mg.connect(audioCtx.destination);
+    const s=audioCtx.createMediaStreamSource(ls);
+    ag=audioCtx.createGain();ag.gain.value=.8;
+    const f=audioCtx.createBiquadFilter();f.type='bandpass';f.frequency.value=1000;f.Q.value=1;
+    s.connect(f);f.connect(ag);ag.connect(mg);
 }
 
-function setupVideoAudio(video) {
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (!masterGain) {
-            masterGain = audioCtx.createGain();
-            masterGain.connect(audioCtx.destination);
-        }
-    }
-
-    try {
-        const source = audioCtx.createMediaElementSource(video);
-        videoGain = audioCtx.createGain();
-        videoGain.gain.value = 0.6;
-        source.connect(videoGain);
-        videoGain.connect(masterGain);
-        video.muted = true;
-    } catch (e) {
-        video.volume = 0.6;
-    }
+async function handleRTC(m){
+    if(m.type==='offer'){await pc.setRemoteDescription(m.sdp);const a=await pc.createAnswer();await pc.setLocalDescription(a);ws.send(JSON.stringify({type:'answer',sdp:a}));}
+    else if(m.type==='answer')await pc.setRemoteDescription(m.sdp);
+    else if(m.type==='ice-candidate'&&m.candidate)await pc.addIceCandidate(m.candidate);
 }
 
-// ==================== СИГНАЛИНГ ====================
-async function handleOffer(m) {
-    if (!pc) initRTC(false);
-    await pc.setRemoteDescription(m.sdp);
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    ws.send(JSON.stringify({ type: 'answer', sdp: answer }));
-}
-
-async function handleAnswer(m) {
-    await pc.setRemoteDescription(m.sdp);
-}
-
-async function handleIce(m) {
-    if (pc && m.candidate) {
-        await pc.addIceCandidate(m.candidate);
-    }
-}
-
-// ==================== ВИДЕО ====================
-function load() {
-    const url = $('vu').value.trim();
-    if (!url) return;
-
-    const video = $('vid');
-    const ph = $('placeholder');
-
-    if (url.match(/\.(mp4|webm|m3u8|ogg)($|\?)/i)) {
-        video.src = url;
-        video.load();
-        setupVideoAudio(video);
-        video.style.display = 'block';
-        ph.style.display = 'none';
-        toast('✅ Видео загружено. Нажмите ▶️');
-    } else {
-        toast('❌ Только прямые ссылки MP4/WebM/HLS');
-    }
-
+function load(){
+    const url=$('vu').value.trim();
+    if(!url)return;
+    const v=$('vid'),ph=$('ph');
+    if(url.match(/\\.(mp4|webm|m3u8|ogg)($|\\?)/i)){
+        v.src=url;v.load();
+        try{if(audioCtx){const s=audioCtx.createMediaElementSource(v);vg=audioCtx.createGain();vg.gain.value=.6;s.connect(vg);vg.connect(mg);v.muted=true;}else{v.volume=.6;}}catch(e){v.volume=.6;}
+        v.style.display='block';ph.style.display='none';toast('Видео загружено');
+        if(dc&&dc.readyState==='open')dc.send(JSON.stringify({type:'load',url}));
+    }else{toast('Только MP4/WebM/HLS');}
     tu();
 }
 
-// ==================== PLAY/PAUSE — РУЧНАЯ СИНХРОНИЗАЦИЯ ====================
-function tp() {
-    const video = $('vid');
-    const btn = $('pb');
-
-    // ВАЖНО: play() вызывается напрямую в обработчике клика
-    if (video.paused) {
-        const promise = video.play();
-        
-        if (promise !== undefined) {
-            promise.then(() => {
-                isPlaying = true;
-                btn.textContent = '⏸';
-                // Отправляем сигнал другому
-                sendSync('play', video.currentTime);
-                toast('▶️ Воспроизведение');
-            }).catch(err => {
-                // iOS заблокировал
-                toast('⚠️ Нажмите на видео');
-                console.log('Play blocked by iOS:', err);
-            });
-        }
-    } else {
-        video.pause();
-        isPlaying = false;
-        btn.textContent = '▶️';
-        sendSync('pause', video.currentTime);
-        toast('⏸ Пауза');
-    }
+function tp(){
+    const v=$('vid'),b=$('pb');
+    if(v.paused){
+        v.play().then(()=>{isPlaying=true;b.textContent='⏸';sendSync('play',v.currentTime);toast('▶️');})
+        .catch(()=>{toast('Нажмите на видео');});
+    }else{v.pause();isPlaying=false;b.textContent='▶️';sendSync('pause',v.currentTime);toast('⏸');}
 }
 
-// КЛИК НА ВИДЕО — для iOS разблокировки
-$('vid').addEventListener('click', function() {
-    if (this.paused) {
-        this.play().then(() => {
-            isPlaying = true;
-            $('pb').textContent = '⏸';
-            sendSync('play', this.currentTime);
-        }).catch(() => {});
-    } else {
-        this.pause();
-        isPlaying = false;
-        $('pb').textContent = '▶️';
-        sendSync('pause', this.currentTime);
-    }
+$('vid').addEventListener('click',function(){
+    if(this.paused){this.play().then(()=>{isPlaying=true;$('pb').textContent='⏸';sendSync('play',this.currentTime);}).catch(()=>{});}
+    else{this.pause();isPlaying=false;$('pb').textContent='▶️';sendSync('pause',this.currentTime);}
 });
 
-function sk(e) {
-    const video = $('vid');
-    const rect = e.target.getBoundingClientRect();
-    const pct = (e.clientX - rect.left) / rect.width;
-    const time = pct * video.duration;
-    video.currentTime = time;
-    sendSync('seek', time);
+function sk(e){const v=$('vid'),r=e.target.getBoundingClientRect();v.currentTime=((e.clientX-r.left)/r.width)*v.duration;sendSync('seek',v.currentTime);}
+
+function sendSync(type,time){
+    const msg=JSON.stringify({type,time});
+    if(dc&&dc.readyState==='open')dc.send(msg);
+    else if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'sync',stype:type,time}));
 }
 
-function sendSync(type, time) {
-    const msg = JSON.stringify({ type, time });
-    if (dc && dc.readyState === 'open') {
-        dc.send(msg);
-    } else if (ws && ws.readyState === 1) {
-        ws.send(JSON.stringify({ type: 'sync', stype: type, time }));
-    }
+function handleSync(m){if(m.stype)applySync({type:m.stype,time:m.time});}
+
+function applySync(m){
+    const v=$('vid');if(!v.duration)return;
+    if(m.type==='play'){v.currentTime=m.time;v.play().then(()=>{isPlaying=true;$('pb').textContent='⏸';}).catch(()=>{toast('Собеседник нажал Play! Нажмите ▶️');$('pb').textContent='▶️';});}
+    else if(m.type==='pause'){v.pause();v.currentTime=m.time;isPlaying=false;$('pb').textContent='▶️';}
+    else if(m.type==='seek')v.currentTime=m.time;
+    else if(m.type==='load'){$('vu').value=m.url;load();}
+    else if(m.type==='sync'){const diff=Math.abs(v.currentTime-m.time);if(diff>1)v.currentTime=m.time;}
 }
 
-function startSyncLoop() {
-    syncTimer = setInterval(() => {
-        const video = $('vid');
-        if (isPlaying && video.duration) {
-            sendSync('sync', video.currentTime);
-        }
-    }, 5000);
+function tu(){$('ubar').classList.toggle('on');}
+async function tmic(){
+    const b=$('mb');
+    if(!ls){try{ls=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true}});if(pc)ls.getTracks().forEach(t=>pc.addTrack(t,ls));setupAudio();isMicOn=true;b.classList.add('on');toast('Микрофон вкл');}catch(e){toast('Нет доступа');}}
+    else{isMicOn=!isMicOn;ls.getAudioTracks().forEach(t=>t.enabled=isMicOn);b.classList.toggle('on',isMicOn);toast(isMicOn?'Микрофон вкл':'Микрофон выкл');}
 }
+function ta(){$('aset').classList.toggle('on');}
+function tf(){const el=$('vbox');if(!document.fullscreenElement)el.requestFullscreen().catch(()=>{});else document.exitFullscreen();}
+function svv(v){const val=v/100;$('vv').textContent=v+'%';if(vg)vg.gain.value=val;else $('vid').volume=val;}
+function sav(v){const val=v/100;$('av').textContent=v+'%';if(ag)ag.gain.value=val;}
 
-function handleSync(m) {
-    if (m.stype) {
-        applySync({ type: m.stype, time: m.time });
-    }
-}
+setInterval(()=>{const v=$('vid');if(v.duration){$('pf').style.width=(v.currentTime/v.duration*100)+'%';$('tm').textContent=fmt(v.currentTime)+' / '+fmt(v.duration);}},100);
 
-function applySync(m) {
-    const video = $('vid');
-    if (!video.duration) return;
-
-    switch (m.type) {
-        case 'play':
-            // iOS: НЕ запускаем автоматически, показываем кнопку
-            video.currentTime = m.time;
-            pendingPlay = true;
-            toast('▶️ Собеседник нажал Play! Нажмите ▶️');
-            $('pb').textContent = '▶️';
-            // Пытаемся запустить (может не сработать на iOS)
-            video.play().then(() => {
-                isPlaying = true;
-                $('pb').textContent = '⏸';
-                pendingPlay = false;
-            }).catch(() => {
-                // iOS заблокировал — ждём ручного нажатия
-            });
-            break;
-            
-        case 'pause':
-            video.pause();
-            video.currentTime = m.time;
-            isPlaying = false;
-            $('pb').textContent = '▶️';
-            pendingPlay = false;
-            break;
-            
-        case 'seek':
-            video.currentTime = m.time;
-            break;
-            
-        case 'load':
-            $('vu').value = m.url;
-            load();
-            break;
-            
-        case 'sync':
-            // Корректировка времени
-            const diff = Math.abs(video.currentTime - m.time);
-            if (diff > 1 && !video.paused) {
-                video.currentTime = m.time;
-            }
-            break;
-    }
-}
-
-// ==================== UI ====================
-function tu() { $('url-bar').classList.toggle('show'); }
-
-async function tmic() {
-    const btn = $('mb');
-
-    if (!localStream) {
-        try {
-            localStream = await navigator.mediaDevices.getUserMedia({
-                audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: false }
-            });
-            if (pc) {
-                localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-            }
-            setupAudioMixing();
-            isMicOn = true;
-            btn.classList.add('on');
-            toast('🎤 Микрофон включён');
-        } catch (e) {
-            toast('❌ Нет доступа к микрофону');
-        }
-    } else {
-        isMicOn = !isMicOn;
-        localStream.getAudioTracks().forEach(t => t.enabled = isMicOn);
-        btn.classList.toggle('on', isMicOn);
-        toast(isMicOn ? '🎤 Микрофон включён' : '🔇 Микрофон выключен');
-    }
-}
-
-function ta() { $('audio-set').classList.toggle('show'); }
-
-function tf() {
-    const el = $('video-box');
-    if (!document.fullscreenElement) {
-        el.requestFullscreen().catch(() => {});
-    } else {
-        document.exitFullscreen();
-    }
-}
-
-function svv(v) {
-    const val = v / 100;
-    $('vv').textContent = v + '%';
-    if (videoGain) videoGain.gain.value = val;
-    else $('vid').volume = val;
-}
-
-function sav(v) {
-    const val = v / 100;
-    $('av').textContent = v + '%';
-    if (voiceGain) voiceGain.gain.value = val;
-}
-
-// ==================== ПРОГРЕСС ====================
-setInterval(() => {
-    const video = $('vid');
-    if (video.duration) {
-        $('pf').style.width = (video.currentTime / video.duration * 100) + '%';
-        $('tm').textContent = fmtTime(video.currentTime) + ' / ' + fmtTime(video.duration);
-    }
-}, 100);
-
-// ==================== АВТО-СКРЫТИЕ UI ====================
 let hideTimer;
-function resetHide() {
-    document.body.classList.remove('hid');
-    clearTimeout(hideTimer);
-    if (isPlaying) {
-        hideTimer = setTimeout(() => document.body.classList.add('hid'), 4000);
-    }
+function rst(){document.body.classList.remove('hid');clearTimeout(hideTimer);if(isPlaying)hideTimer=setTimeout(()=>document.body.classList.add('hid'),4000);}
+document.addEventListener('click',rst);document.addEventListener('touchstart',rst);
+
+$('vid').addEventListener('play',()=>{isPlaying=true;$('pb').textContent='⏸';});
+$('vid').addEventListener('pause',()=>{isPlaying=false;$('pb').textContent='▶️';});
+$('vid').addEventListener('ended',()=>{isPlaying=false;$('pb').textContent='▶️';});
+
+if('wakeLock' in navigator){
+    navigator.wakeLock.request('screen').catch(()=>{});
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')navigator.wakeLock.request('screen').catch(()=>{});});
 }
-document.addEventListener('click', resetHide);
-document.addEventListener('touchstart', resetHide);
+</script>
+</body>
+</html>`;
 
-// ==================== СОБЫТИЯ ВИДЕО ====================
-$('vid').addEventListener('play', () => { isPlaying = true; $('pb').textContent = '⏸'; });
-$('vid').addEventListener('pause', () => { isPlaying = false; $('pb').textContent = '▶️'; });
-$('vid').addEventListener('ended', () => { isPlaying = false; $('pb').textContent = '▶️'; });
+fs.writeFileSync('public/index.html', html);
+app.use(express.static('public'));
 
-// ==================== WAKE LOCK ====================
-if ('wakeLock' in navigator) {
-    navigator.wakeLock.request('screen').catch(() => {});
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-            navigator.wakeLock.request('screen').catch(() => {});
+const wss = new WebSocketServer({ server, path: '/ws' });
+const rooms = new Map();
+
+wss.on('connection', (ws) => {
+    let currentRoom = null;
+    let userName = '';
+
+    ws.on('message', (data) => {
+        try {
+            const msg = JSON.parse(data.toString());
+            if (msg.type === 'join') {
+                currentRoom = msg.room;
+                userName = msg.name || 'User';
+                if (!rooms.has(currentRoom)) rooms.set(currentRoom, new Map());
+                const room = rooms.get(currentRoom);
+                room.set(ws, userName);
+                const peers = Array.from(room.values());
+                ws.send(JSON.stringify({ type: 'joined', peers }));
+                broadcast(currentRoom, { type: 'peer-joined', name: userName }, ws);
+            } else if (['offer','answer','ice-candidate','sync'].includes(msg.type)) {
+                broadcast(currentRoom, msg, ws);
+            }
+        } catch (e) { console.error('WS error:', e); }
+    });
+
+    ws.on('close', () => {
+        if (currentRoom && rooms.has(currentRoom)) {
+            rooms.get(currentRoom).delete(ws);
+            broadcast(currentRoom, { type: 'peer-left', name: userName }, null);
+            if (rooms.get(currentRoom).size === 0) rooms.delete(currentRoom);
+        }
+    });
+});
+
+function broadcast(roomId, msg, exclude) {
+    if (!rooms.has(roomId)) return;
+    rooms.get(roomId).forEach((name, ws) => {
+        if (ws !== exclude && ws.readyState === 1) {
+            try { ws.send(JSON.stringify(msg)); } catch (e) {}
         }
     });
 }
 
-// ==================== AUDIO CONTEXT UNLOCK ====================
-document.addEventListener('click', function unlockAudio() {
-    if (audioCtx && audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
-}, { once: true });
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log('CineSync on port ' + PORT);
+});
