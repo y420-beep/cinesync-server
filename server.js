@@ -1,16 +1,4 @@
-const express = require('express');
-const { createServer } = require('http');
-const { WebSocketServer } = require('ws');
-const fs = require('fs');
-
-const app = express();
-const server = createServer(app);
-
-// Создаём папку public
-if (!fs.existsSync('public')) fs.mkdirSync('public');
-
-// HTML файл
-const html = `<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
@@ -20,9 +8,11 @@ const html = `<!DOCTYPE html>
 <title>CineSync</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0f;color:#fff;height:100dvh;overflow:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0f;color:#fff;height:100dvh;overflow:hidden;display:flex;flex-direction:column}
 .hidden{display:none!important}
-#connect{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#0a0a0f,#1a1a2e)}
+
+/* Экран подключения */
+#connect{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#0a0a0f,#1a1a2e);z-index:1000}
 .logo{font-size:48px;font-weight:800;background:linear-gradient(135deg,#e50914,#ff6b6b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
 .sub{color:#888;font-size:14px;margin-bottom:40px;text-align:center}
 input{width:100%;max-width:320px;padding:16px 20px;border:2px solid #1a1a2e;border-radius:16px;background:#1a1a2e;color:#fff;font-size:16px;margin-bottom:12px;outline:none;-webkit-appearance:none}
@@ -34,47 +24,78 @@ input:focus{border-color:#e50914}
 .ok{background:rgba(0,255,136,.1);color:#00ff88;border:1px solid rgba(0,255,136,.2)}
 .wait{background:rgba(0,212,255,.1);color:#00d4ff;border:1px solid rgba(0,212,255,.2)}
 .err{background:rgba(229,9,20,.1);color:#e50914;border:1px solid rgba(229,9,20,.2)}
+
+/* Основной интерфейс */
 #main{flex:1;display:flex;flex-direction:column;position:relative}
-#vbox{flex:1;background:#000;display:flex;align-items:center;justify-content:center;position:relative}
-video{width:100%;height:100%;object-fit:contain}
+
+/* Видео по центру */
+#vbox{flex:1;display:flex;align-items:center;justify-content:center;position:relative;background:#000;overflow:hidden}
+video{width:100%;height:100%;object-fit:contain;max-height:70vh}
 #ph{text-align:center;padding:20px;color:#666}
 #ph .ic{font-size:64px;margin-bottom:16px;display:block}
-#ubar{position:absolute;top:0;left:0;right:0;background:rgba(10,10,15,.95);padding:16px;padding-top:max(16px,env(safe-area-inset-top));transform:translateY(-100%);transition:.3s;z-index:100;display:flex;gap:8px}
-#ubar.on{transform:translateY(0)}
-#ubar input{flex:1;margin:0}
-#badge{position:absolute;top:max(16px,env(safe-area-inset-top));right:16px;display:flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(0,0,0,.6);backdrop-filter:blur(10px);border-radius:20px;font-size:12px;z-index:50}
+
+/* Кнопка полноэкран на видео */
+#fs-btn{position:absolute;top:max(12px,env(safe-area-inset-top));right:12px;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.6);backdrop-filter:blur(10px);border:none;color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;z-index:10;-webkit-appearance:none}
+
+/* Индикатор подключения */
+#badge{position:absolute;top:max(12px,env(safe-area-inset-top));left:12px;display:flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(0,0,0,.6);backdrop-filter:blur(10px);border-radius:20px;font-size:12px;z-index:10}
 .dot{width:8px;height:8px;border-radius:50%;background:#00ff88;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-#peers{position:absolute;top:max(60px,env(safe-area-inset-top)+44px);right:16px;display:flex;flex-direction:column;gap:8px;z-index:50}
+
+/* Голосовые индикаторы */
+#peers{position:absolute;top:max(60px,env(safe-area-inset-top)+44px);left:12px;display:flex;flex-direction:column;gap:8px;z-index:10}
 .peer{display:flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(0,0,0,.6);backdrop-filter:blur(10px);border-radius:20px;font-size:12px}
 .peer.talk{background:rgba(0,255,136,.2);border:1px solid #00ff88}
 .pv{width:40px;height:4px;background:rgba(255,255,255,.2);border-radius:2px;overflow:hidden}
 .pvf{height:100%;background:#00ff88;width:0%;transition:.1s}
-#aset{position:absolute;bottom:120px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(10,10,15,.95);padding:20px;border-radius:20px;width:90%;max-width:300px;opacity:0;pointer-events:none;transition:.3s;z-index:60}
-#aset.on{opacity:1;pointer-events:all;transform:translateX(-50%) translateY(0)}
+
+/* Панель URL (всплывающая снизу) */
+#url-bar{position:absolute;bottom:200px;left:16px;right:16px;background:rgba(10,10,15,.95);backdrop-filter:blur(20px);padding:16px;border-radius:20px;transform:translateY(200%);transition:.3s;z-index:100;display:flex;gap:8px;border:1px solid #1a1a2e}
+#url-bar.on{transform:translateY(0)}
+#url-bar input{flex:1;margin:0}
+
+/* Настройки звука (всплывающие снизу) */
+#aset{position:absolute;bottom:200px;left:16px;right:16px;background:rgba(10,10,15,.95);backdrop-filter:blur(20px);padding:20px;border-radius:20px;transform:translateY(200%);transition:.3s;z-index:100;border:1px solid #1a1a2e}
+#aset.on{transform:translateY(0)}
 .sl{margin-bottom:16px}
 .sl label{display:flex;justify-content:space-between;font-size:13px;color:#888;margin-bottom:8px}
 .sl label span{color:#fff;font-weight:600}
 input[type=range]{width:100%;height:4px;background:#1a1a2e;border-radius:2px;outline:none;-webkit-appearance:none}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;background:#e50914;border-radius:50%;cursor:pointer}
-#ctrl{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,.9),transparent);padding:20px 16px 32px;padding-bottom:max(32px,env(safe-area-inset-bottom));transition:.3s}
-.row{display:flex;align-items:center;gap:16px;margin-bottom:12px}
-.cb{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;-webkit-appearance:none}
-.cb:active{background:rgba(255,255,255,.3)}
-.cb.big{width:56px;height:56px;font-size:24px}
-.cb.on{background:#e50914}
+
+/* Нижняя панель управления */
+#ctrl{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,.95),rgba(0,0,0,.7),transparent);padding:20px 16px 32px;padding-bottom:max(32px,env(safe-area-inset-bottom));z-index:50}
+
+/* Прогресс и время */
+.progress-row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
 .prog{flex:1;height:4px;background:rgba(255,255,255,.2);border-radius:2px;position:relative;cursor:pointer}
-.prog-f{height:100%;background:#e50914;border-radius:2px;width:0%}
+.prog-f{height:100%;background:#e50914;border-radius:2px;width:0%;position:relative}
+.prog-f::after{content:'';position:absolute;right:-6px;top:50%;transform:translateY(-50%);width:12px;height:12px;background:#e50914;border-radius:50%;opacity:0;transition:.2s}
+.prog:hover .prog-f::after{opacity:1}
 .tm{font-size:12px;color:rgba(255,255,255,.8);min-width:90px;text-align:right;font-variant-numeric:tabular-nums}
+
+/* Кнопки управления */
+.controls-row{display:flex;align-items:center;justify-content:space-between}
+.center-btns{display:flex;align-items:center;gap:20px}
+.cb{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.15);backdrop-filter:blur(10px);border:none;color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;-webkit-appearance:none;transition:.2s}
+.cb:active{background:rgba(255,255,255,.3);transform:scale(.95)}
+.cb.big{width:64px;height:64px;font-size:28px;background:#e50914}
+.cb.big:active{background:#b20710}
+.cb.on{background:#e50914}
+
+/* Toast */
 #toast-c{position:fixed;top:max(80px,env(safe-area-inset-top)+60px);left:50%;transform:translateX(-50%);z-index:3000;display:flex;flex-direction:column;gap:8px;pointer-events:none}
 .toast{background:#1a1a2e;padding:12px 20px;border-radius:12px;font-size:14px;border-left:3px solid #e50914;animation:ti .3s;max-width:300px;text-align:center}
 @keyframes ti{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-.hid #ctrl,.hid #badge,.hid #peers{opacity:0;pointer-events:none}
-.hid #ubar{transform:translateY(-100%)}
+
+/* Скрытие UI */
+.hid #ctrl,.hid #badge,.hid #peers,.hid #fs-btn{opacity:0;pointer-events:none}
+.hid #url-bar,.hid #aset{transform:translateY(200%)}
 </style>
 </head>
 <body>
 
+<!-- Экран подключения -->
 <div id="connect">
 <div class="logo">CineSync</div>
 <div class="sub">Смотрите фильмы вместе</div>
@@ -86,29 +107,39 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
 <div id="st" class="hidden"></div>
 </div>
 
+<!-- Основной интерфейс -->
 <div id="main" class="hidden">
 <div id="vbox">
 <video id="vid" playsinline preload="metadata" style="display:none"></video>
-<div id="ph"><span class="ic">🎬</span><div>Нажмите 🔗 для видео</div></div>
+<div id="ph"><span class="ic">🎬</span><div>Нажмите 🔗 чтобы загрузить видео</div></div>
+<button id="fs-btn" onclick="tf()">⛶</button>
 </div>
-<div id="ubar"><input type="text" id="vu" placeholder="URL видео (MP4/WebM)"><button class="btn btn-red" style="width:auto;padding:12px 20px;font-size:14px" onclick="load()">▶️</button></div>
+
 <div id="badge"><div class="dot"></div><span id="bt">Подключено</span></div>
 <div id="peers"></div>
-<div id="aset">
-<div class="sl"><label>Фильм <span id="vv">60%</span></label><input type="range" min="0" max="100" value="60" oninput="svv(this.value)"></div>
-<div class="sl"><label>Голос <span id="av">80%</span></label><input type="range" min="0" max="100" value="80" oninput="sav(this.value)"></div>
+
+<div id="url-bar">
+<input type="text" id="vu" placeholder="URL видео (MP4/WebM)...">
+<button class="btn btn-red" style="width:auto;padding:12px 20px;font-size:14px" onclick="load()">▶️</button>
 </div>
+
+<div id="aset">
+<div class="sl"><label>Громкость фильма <span id="vv">60%</span></label><input type="range" min="0" max="100" value="60" oninput="svv(this.value)"></div>
+<div class="sl"><label>Громкость голоса <span id="av">80%</span></label><input type="range" min="0" max="100" value="80" oninput="sav(this.value)"></div>
+</div>
+
 <div id="ctrl">
-<div class="row">
-<button class="cb big" id="pb" onclick="tp()">▶️</button>
+<div class="progress-row">
 <div class="prog" onclick="sk(event)"><div class="prog-f" id="pf"></div></div>
 <div class="tm" id="tm">00:00 / 00:00</div>
 </div>
-<div class="row" style="justify-content:center;gap:24px">
-<button class="cb" onclick="tu()">🔗</button>
+<div class="controls-row">
+<div class="center-btns">
 <button class="cb" id="mb" onclick="tmic()">🎤</button>
+<button class="cb big" id="pb" onclick="tp()">▶️</button>
+<button class="cb" onclick="tu()">🔗</button>
+</div>
 <button class="cb" onclick="ta()">🔊</button>
-<button class="cb" onclick="tf()">⛶</button>
 </div>
 </div>
 </div>
@@ -210,7 +241,7 @@ function load(){
     if(url.match(/\\.(mp4|webm|m3u8|ogg)($|\\?)/i)){
         v.src=url;v.load();
         try{if(audioCtx){const s=audioCtx.createMediaElementSource(v);vg=audioCtx.createGain();vg.gain.value=.6;s.connect(vg);vg.connect(mg);v.muted=true;}else{v.volume=.6;}}catch(e){v.volume=.6;}
-        v.style.display='block';ph.style.display='none';toast('Видео загружено');
+        v.style.display='block';ph.style.display='none';$('fs-btn').style.display='flex';toast('Видео загружено');
         if(dc&&dc.readyState==='open')dc.send(JSON.stringify({type:'load',url}));
     }else{toast('Только MP4/WebM/HLS');}
     tu();
@@ -248,14 +279,18 @@ function applySync(m){
     else if(m.type==='sync'){const diff=Math.abs(v.currentTime-m.time);if(diff>1)v.currentTime=m.time;}
 }
 
-function tu(){$('ubar').classList.toggle('on');}
+function tu(){$('url-bar').classList.toggle('on');}
 async function tmic(){
     const b=$('mb');
     if(!ls){try{ls=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true}});if(pc)ls.getTracks().forEach(t=>pc.addTrack(t,ls));setupAudio();isMicOn=true;b.classList.add('on');toast('Микрофон вкл');}catch(e){toast('Нет доступа');}}
     else{isMicOn=!isMicOn;ls.getAudioTracks().forEach(t=>t.enabled=isMicOn);b.classList.toggle('on',isMicOn);toast(isMicOn?'Микрофон вкл':'Микрофон выкл');}
 }
 function ta(){$('aset').classList.toggle('on');}
-function tf(){const el=$('vbox');if(!document.fullscreenElement)el.requestFullscreen().catch(()=>{});else document.exitFullscreen();}
+function tf(){
+    const el=$('vbox');
+    if(!document.fullscreenElement)el.requestFullscreen().catch(()=>{});
+    else document.exitFullscreen();
+}
 function svv(v){const val=v/100;$('vv').textContent=v+'%';if(vg)vg.gain.value=val;else $('vid').volume=val;}
 function sav(v){const val=v/100;$('av').textContent=v+'%';if(ag)ag.gain.value=val;}
 
@@ -275,55 +310,4 @@ if('wakeLock' in navigator){
 }
 </script>
 </body>
-</html>`;
-
-fs.writeFileSync('public/index.html', html);
-app.use(express.static('public'));
-
-const wss = new WebSocketServer({ server, path: '/ws' });
-const rooms = new Map();
-
-wss.on('connection', (ws) => {
-    let currentRoom = null;
-    let userName = '';
-
-    ws.on('message', (data) => {
-        try {
-            const msg = JSON.parse(data.toString());
-            if (msg.type === 'join') {
-                currentRoom = msg.room;
-                userName = msg.name || 'User';
-                if (!rooms.has(currentRoom)) rooms.set(currentRoom, new Map());
-                const room = rooms.get(currentRoom);
-                room.set(ws, userName);
-                const peers = Array.from(room.values());
-                ws.send(JSON.stringify({ type: 'joined', peers }));
-                broadcast(currentRoom, { type: 'peer-joined', name: userName }, ws);
-            } else if (['offer','answer','ice-candidate','sync'].includes(msg.type)) {
-                broadcast(currentRoom, msg, ws);
-            }
-        } catch (e) { console.error('WS error:', e); }
-    });
-
-    ws.on('close', () => {
-        if (currentRoom && rooms.has(currentRoom)) {
-            rooms.get(currentRoom).delete(ws);
-            broadcast(currentRoom, { type: 'peer-left', name: userName }, null);
-            if (rooms.get(currentRoom).size === 0) rooms.delete(currentRoom);
-        }
-    });
-});
-
-function broadcast(roomId, msg, exclude) {
-    if (!rooms.has(roomId)) return;
-    rooms.get(roomId).forEach((name, ws) => {
-        if (ws !== exclude && ws.readyState === 1) {
-            try { ws.send(JSON.stringify(msg)); } catch (e) {}
-        }
-    });
-}
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-    console.log('CineSync on port ' + PORT);
-});
+</html>
