@@ -44,11 +44,13 @@ video{width:100%;height:100%;object-fit:contain;max-height:70vh;background:#000}
 .pv{width:40px;height:4px;background:rgba(255,255,255,.2);border-radius:2px;overflow:hidden}
 .pvf{height:100%;background:#00ff88;width:0%;transition:.1s}
 
-#url-bar{position:absolute;bottom:220px;left:16px;right:16px;background:rgba(10,10,15,.95);backdrop-filter:blur(20px);padding:16px;border-radius:20px;transform:translateY(200%);transition:.3s;z-index:100;display:flex;gap:8px;border:1px solid #1a1a2e}
+/* URL панель - скрыта по умолчанию */
+#url-bar{position:absolute;bottom:220px;left:16px;right:16px;background:rgba(10,10,15,.95);backdrop-filter:blur(20px);padding:16px;border-radius:20px;transform:translateY(300%);transition:.3s;z-index:100;display:flex;gap:8px;border:1px solid #1a1a2e}
 #url-bar.on{transform:translateY(0)}
 #url-bar input{flex:1;margin:0}
 
-#aset{position:absolute;bottom:220px;left:16px;right:16px;background:rgba(10,10,15,.95);backdrop-filter:blur(20px);padding:20px;border-radius:20px;transform:translateY(200%);transition:.3s;z-index:100;border:1px solid #1a1a2e}
+/* Настройки звука - скрыты по умолчанию */
+#aset{position:absolute;bottom:220px;left:16px;right:16px;background:rgba(10,10,15,.95);backdrop-filter:blur(20px);padding:20px;border-radius:20px;transform:translateY(300%);transition:.3s;z-index:100;border:1px solid #1a1a2e}
 #aset.on{transform:translateY(0)}
 .sl{margin-bottom:16px}
 .sl label{display:flex;justify-content:space-between;font-size:13px;color:#888;margin-bottom:8px}
@@ -56,6 +58,7 @@ video{width:100%;height:100%;object-fit:contain;max-height:70vh;background:#000}
 input[type=range]{width:100%;height:4px;background:#1a1a2e;border-radius:2px;outline:none;-webkit-appearance:none}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;background:#e50914;border-radius:50%;cursor:pointer}
 
+/* Нижняя панель */
 #ctrl{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,.95),rgba(0,0,0,.7),transparent);padding:20px 16px 32px;padding-bottom:max(32px,env(safe-area-inset-bottom));z-index:50}
 
 .progress-row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
@@ -77,8 +80,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
 .toast{background:#1a1a2e;padding:14px 24px;border-radius:16px;font-size:15px;border-left:4px solid #e50914;animation:ti .3s;max-width:320px;text-align:center;font-weight:500}
 @keyframes ti{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 
+/* Скрытие UI */
 .hid #ctrl,.hid #badge,.hid #peers,.hid #fs-btn{opacity:0;pointer-events:none}
-.hid #url-bar,.hid #aset{transform:translateY(200%)}
+.hid #url-bar,.hid #aset{transform:translateY(300%)!important}
 </style>
 </head>
 <body>
@@ -228,8 +232,10 @@ function load(){
     const v=$('vid');
     videoEl=v;
     
-    // Удаляем старые обработчики если есть
-    v.oncanplay=null;v.onerror=null;v.onplay=null;v.onpause=null;v.ontimeupdate=null;
+    // Сбрасываем
+    v.pause();
+    v.removeAttribute('src');
+    v.load();
     
     v.src=url;
     v.load();
@@ -238,6 +244,11 @@ function load(){
         $('ph').style.display='none';
         v.style.display='block';
         $('fs-btn').style.display='flex';
+        
+        // Звук
+        v.muted=false;
+        v.volume=0.6;
+        
         setupVideoAudio();
         toast('Видео готово! Нажмите ▶️');
     };
@@ -256,7 +267,8 @@ function load(){
         toast(msg);
     };
     
-    tu();
+    // Закрываем панель URL
+    $('url-bar').classList.remove('on');
 }
 
 function setupVideoAudio(){
@@ -266,9 +278,12 @@ function setupVideoAudio(){
             audioCtx=new(window.AudioContext||webkitAudioContext)();
             mg=audioCtx.createGain();mg.connect(audioCtx.destination);
         }
-        const s=audioCtx.createMediaElementSource(videoEl);
-        vg=audioCtx.createGain();vg.gain.value=.6;
-        s.connect(vg);vg.connect(mg);
+        // Не подключаем MediaElementSource повторно
+        if(!vg){
+            const s=audioCtx.createMediaElementSource(videoEl);
+            vg=audioCtx.createGain();vg.gain.value=.6;
+            s.connect(vg);vg.connect(mg);
+        }
         videoEl.muted=false;
         videoEl.volume=1;
     }catch(e){
@@ -288,7 +303,6 @@ function tp(){
                 toast('▶️ Воспроизведение');
             }).catch(err=>{
                 toast('Нажмите на видео для старта');
-                console.log('Play blocked:',err);
             });
         }
     }else{
@@ -349,18 +363,44 @@ function applySync(m){
     }
 }
 
-function tu(){$('url-bar').classList.toggle('on');}
+// URL панель - toggle
+function tu(){
+    $('url-bar').classList.toggle('on');
+    // Закрываем настройки если открыты
+    $('aset').classList.remove('on');
+}
+
+// Настройки звука - toggle
+function ta(){
+    $('aset').classList.toggle('on');
+    // Закрываем URL если открыт
+    $('url-bar').classList.remove('on');
+}
+
+// Полноэкран
+function tf(){
+    const el=$('vbox');
+    if(!document.fullscreenElement){
+        if(el.requestFullscreen){
+            el.requestFullscreen().catch(()=>{});
+        }else if(el.webkitRequestFullscreen){
+            el.webkitRequestFullscreen();
+        }
+    }else{
+        if(document.exitFullscreen){
+            document.exitFullscreen();
+        }else if(document.webkitExitFullscreen){
+            document.webkitExitFullscreen();
+        }
+    }
+}
+
 async function tmic(){
     const b=$('mb');
     if(!ls){try{ls=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true}});if(pc)ls.getTracks().forEach(t=>pc.addTrack(t,ls));setupAudio();isMicOn=true;b.classList.add('on');toast('🎤 Микрофон вкл');}catch(e){toast('❌ Нет доступа');}}
     else{isMicOn=!isMicOn;ls.getAudioTracks().forEach(t=>t.enabled=isMicOn);b.classList.toggle('on',isMicOn);toast(isMicOn?'🎤 Микрофон вкл':'🔇 Микрофон выкл');}
 }
-function ta(){$('aset').classList.toggle('on');}
-function tf(){
-    const el=$('vbox');
-    if(!document.fullscreenElement)el.requestFullscreen().catch(()=>{});
-    else document.exitFullscreen();
-}
+
 function svv(v){const val=v/100;$('vv').textContent=v+'%';if(vg)vg.gain.value=val;else if(videoEl)videoEl.volume=val;}
 function sav(v){const val=v/100;$('av').textContent=v+'%';if(ag)ag.gain.value=val;}
 
@@ -372,9 +412,20 @@ setInterval(()=>{
     }
 },200);
 
+// Авто-скрытие UI
 let hideTimer;
-function rst(){document.body.classList.remove('hid');clearTimeout(hideTimer);if(isPlaying)hideTimer=setTimeout(()=>document.body.classList.add('hid'),4000);}
-document.addEventListener('click',rst);document.addEventListener('touchstart',rst);
+function rst(){
+    document.body.classList.remove('hid');
+    clearTimeout(hideTimer);
+    if(isPlaying)hideTimer=setTimeout(()=>document.body.classList.add('hid'),4000);
+}
+document.addEventListener('click',rst);
+document.addEventListener('touchstart',rst);
+
+// Не скрывать при клике на панели
+$('url-bar').addEventListener('click',(e)=>e.stopPropagation());
+$('aset').addEventListener('click',(e)=>e.stopPropagation());
+$('ctrl').addEventListener('click',(e)=>e.stopPropagation());
 
 if('wakeLock' in navigator){
     navigator.wakeLock.request('screen').catch(()=>{});
