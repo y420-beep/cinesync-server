@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0a0f">
 <title>CineSync</title>
+<link href="https://vjs.zencdn.net/8.6.1/video-js.css" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0f;color:#fff;height:100dvh;overflow:hidden;display:flex;flex-direction:column}
@@ -27,27 +28,33 @@ input:focus{border-color:#e50914}
 
 #main{flex:1;display:flex;flex-direction:column;position:relative}
 
+/* Video.js контейнер */
 #vbox{flex:1;display:flex;align-items:center;justify-content:center;position:relative;background:#000;overflow:hidden}
-video{width:100%;height:100%;object-fit:contain;max-height:70vh}
-#ph{text-align:center;padding:20px;color:#666}
+.video-js{width:100%!important;height:100%!important;max-height:70vh}
+.vjs-big-play-button{display:none!important}
+
+#ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#666;z-index:5}
 #ph .ic{font-size:64px;margin-bottom:16px;display:block}
 
-#fs-btn{position:absolute;top:max(12px,env(safe-area-inset-top));right:12px;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.6);backdrop-filter:blur(10px);border:none;color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;z-index:10;-webkit-appearance:none}
+/* Кнопка полноэкран на видео */
+#fs-btn{position:absolute;top:max(12px,env(safe-area-inset-top));right:12px;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.6);backdrop-filter:blur(10px);border:none;color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;z-index:20;-webkit-appearance:none}
 
-#badge{position:absolute;top:max(12px,env(safe-area-inset-top));left:12px;display:flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(0,0,0,.6);backdrop-filter:blur(10px);border-radius:20px;font-size:12px;z-index:10}
+#badge{position:absolute;top:max(12px,env(safe-area-inset-top));left:12px;display:flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(0,0,0,.6);backdrop-filter:blur(10px);border-radius:20px;font-size:12px;z-index:20}
 .dot{width:8px;height:8px;border-radius:50%;background:#00ff88;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
-#peers{position:absolute;top:max(60px,env(safe-area-inset-top)+44px);left:12px;display:flex;flex-direction:column;gap:8px;z-index:10}
+#peers{position:absolute;top:max(60px,env(safe-area-inset-top)+44px);left:12px;display:flex;flex-direction:column;gap:8px;z-index:20}
 .peer{display:flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(0,0,0,.6);backdrop-filter:blur(10px);border-radius:20px;font-size:12px}
 .peer.talk{background:rgba(0,255,136,.2);border:1px solid #00ff88}
 .pv{width:40px;height:4px;background:rgba(255,255,255,.2);border-radius:2px;overflow:hidden}
 .pvf{height:100%;background:#00ff88;width:0%;transition:.1s}
 
+/* URL панель */
 #url-bar{position:absolute;bottom:200px;left:16px;right:16px;background:rgba(10,10,15,.95);backdrop-filter:blur(20px);padding:16px;border-radius:20px;transform:translateY(200%);transition:.3s;z-index:100;display:flex;gap:8px;border:1px solid #1a1a2e}
 #url-bar.on{transform:translateY(0)}
 #url-bar input{flex:1;margin:0}
 
+/* Настройки звука */
 #aset{position:absolute;bottom:200px;left:16px;right:16px;background:rgba(10,10,15,.95);backdrop-filter:blur(20px);padding:20px;border-radius:20px;transform:translateY(200%);transition:.3s;z-index:100;border:1px solid #1a1a2e}
 #aset.on{transform:translateY(0)}
 .sl{margin-bottom:16px}
@@ -56,6 +63,7 @@ video{width:100%;height:100%;object-fit:contain;max-height:70vh}
 input[type=range]{width:100%;height:4px;background:#1a1a2e;border-radius:2px;outline:none;-webkit-appearance:none}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;background:#e50914;border-radius:50%;cursor:pointer}
 
+/* Нижняя панель */
 #ctrl{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,.95),rgba(0,0,0,.7),transparent);padding:20px 16px 32px;padding-bottom:max(32px,env(safe-area-inset-bottom));z-index:50}
 
 .progress-row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
@@ -96,8 +104,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
 
 <div id="main" class="hidden">
 <div id="vbox">
-<video id="vid" playsinline preload="metadata" style="display:none"></video>
 <div id="ph"><span class="ic">🎬</span><div>Нажмите 🔗 чтобы загрузить видео</div></div>
+<video id="vid" class="video-js vjs-default-skin vjs-big-play-centered" playsinline preload="auto" style="display:none"></video>
 <button id="fs-btn" onclick="tf()">⛶</button>
 </div>
 
@@ -105,7 +113,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
 <div id="peers"></div>
 
 <div id="url-bar">
-<input type="text" id="vu" placeholder="URL видео (MP4/WebM)...">
+<input type="text" id="vu" placeholder="URL видео (MP4/WebM/HLS)...">
 <button class="btn btn-red" style="width:auto;padding:12px 20px;font-size:14px" onclick="load()">▶️</button>
 </div>
 
@@ -132,8 +140,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
 
 <div id="toast-c"></div>
 
+<script src="https://vjs.zencdn.net/8.6.1/video.min.js"></script>
 <script>
 let ws,pc,dc,ls,room,myName='',isHost=false,isPlaying=false,isMicOn=false,audioCtx,vg,ag,mg;
+let player = null;
 const WS_URL=(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';
 
 function $(id){return document.getElementById(id)}
@@ -200,7 +210,7 @@ async function initRTC(init){
 }
 
 function setupDC(){
-    dc.onopen=()=>{setInterval(()=>{const v=$('vid');if(isPlaying&&v.currentTime)dc.send(JSON.stringify({type:'sync',t:v.currentTime,p:!v.paused}))},5000);};
+    dc.onopen=()=>{setInterval(()=>{if(player&&isPlaying)dc.send(JSON.stringify({type:'sync',t:player.currentTime(),p:!player.paused()}))},5000);};
     dc.onmessage=e=>applySync(JSON.parse(e.data));
 }
 
@@ -223,30 +233,86 @@ async function handleRTC(m){
 function load(){
     const url=$('vu').value.trim();
     if(!url)return;
-    const v=$('vid'),ph=$('ph');
-    if(url.match(/\.(mp4|webm|m3u8|ogg)($|\?)/i)){
-        v.src=url;v.load();
-        try{if(audioCtx){const s=audioCtx.createMediaElementSource(v);vg=audioCtx.createGain();vg.gain.value=.6;s.connect(vg);vg.connect(mg);v.muted=true;}else{v.volume=.6;}}catch(e){v.volume=.6;}
-        v.style.display='block';ph.style.display='none';$('fs-btn').style.display='flex';toast('Видео загружено');
-        if(dc&&dc.readyState==='open')dc.send(JSON.stringify({type:'load',url}));
-    }else{toast('Только MP4/WebM/HLS');}
+    
+    if(!url.match(/\.(mp4|webm|m3u8|ogg|mkv)($|\?)/i)){
+        toast('Только прямые ссылки MP4/WebM/HLS');
+        return;
+    }
+    
+    $('ph').style.display='none';
+    $('vid').style.display='block';
+    
+    if(player){
+        player.src({type:'video/mp4',src:url});
+        player.load();
+    }else{
+        player=videojs('vid',{
+            controls:false,
+            autoplay:false,
+            preload:'auto',
+            fluid:true,
+            html5:{vhs:{overrideNative:true},nativeAudioTracks:false,nativeVideoTracks:false}
+        });
+        player.src({type:'video/mp4',src:url});
+        
+        player.on('play',()=>{isPlaying=true;$('pb').textContent='⏸';sendSync('play',player.currentTime());});
+        player.on('pause',()=>{isPlaying=false;$('pb').textContent='▶️';sendSync('pause',player.currentTime());});
+        player.on('timeupdate',()=>{
+            if(player.duration()){
+                $('pf').style.width=(player.currentTime()/player.duration()*100)+'%';
+                $('tm').textContent=fmt(player.currentTime())+' / '+fmt(player.duration());
+            }
+        });
+        player.on('ended',()=>{isPlaying=false;$('pb').textContent='▶️';});
+    }
+    
+    setupVideoAudio();
+    toast('Видео загружено');
+    if(dc&&dc.readyState==='open')dc.send(JSON.stringify({type:'load',url}));
     tu();
 }
 
-function tp(){
-    const v=$('vid'),b=$('pb');
-    if(v.paused){
-        v.play().then(()=>{isPlaying=true;b.textContent='⏸';sendSync('play',v.currentTime);toast('▶️');})
-        .catch(()=>{toast('Нажмите на видео');});
-    }else{v.pause();isPlaying=false;b.textContent='▶️';sendSync('pause',v.currentTime);toast('⏸');}
+function setupVideoAudio(){
+    if(!player)return;
+    try{
+        const tech=player.tech({willChangeFires:true});
+        if(tech&&tech.el){
+            const el=tech.el();
+            if(audioCtx){
+                const s=audioCtx.createMediaElementSource(el);
+                vg=audioCtx.createGain();vg.gain.value=.6;
+                s.connect(vg);vg.connect(mg);
+                el.muted=true;
+                player.volume(1);
+            }
+        }
+    }catch(e){
+        player.volume(0.6);
+    }
 }
 
-$('vid').addEventListener('click',function(){
-    if(this.paused){this.play().then(()=>{isPlaying=true;$('pb').textContent='⏸';sendSync('play',this.currentTime);}).catch(()=>{});}
-    else{this.pause();isPlaying=false;$('pb').textContent='▶️';sendSync('pause',this.currentTime);}
-});
+function tp(){
+    if(!player){toast('Сначала загрузите видео');return;}
+    if(player.paused()){
+        player.play().then(()=>{
+            isPlaying=true;$('pb').textContent='⏸';
+            sendSync('play',player.currentTime());
+        }).catch(()=>{toast('Нажмите на видео');});
+    }else{
+        player.pause();
+        isPlaying=false;$('pb').textContent='▶️';
+        sendSync('pause',player.currentTime());
+    }
+}
 
-function sk(e){const v=$('vid'),r=e.target.getBoundingClientRect();v.currentTime=((e.clientX-r.left)/r.width)*v.duration;sendSync('seek',v.currentTime);}
+function sk(e){
+    if(!player||!player.duration())return;
+    const r=e.target.getBoundingClientRect();
+    const pct=(e.clientX-r.left)/r.width;
+    const time=pct*player.duration();
+    player.currentTime(time);
+    sendSync('seek',time);
+}
 
 function sendSync(type,time){
     const msg=JSON.stringify({type,time});
@@ -257,12 +323,21 @@ function sendSync(type,time){
 function handleSync(m){if(m.stype)applySync({type:m.stype,time:m.time});}
 
 function applySync(m){
-    const v=$('vid');if(!v.duration)return;
-    if(m.type==='play'){v.currentTime=m.time;v.play().then(()=>{isPlaying=true;$('pb').textContent='⏸';}).catch(()=>{toast('Собеседник нажал Play! Нажмите ▶️');$('pb').textContent='▶️';});}
-    else if(m.type==='pause'){v.pause();v.currentTime=m.time;isPlaying=false;$('pb').textContent='▶️';}
-    else if(m.type==='seek')v.currentTime=m.time;
-    else if(m.type==='load'){$('vu').value=m.url;load();}
-    else if(m.type==='sync'){const diff=Math.abs(v.currentTime-m.time);if(diff>1)v.currentTime=m.time;}
+    if(!player)return;
+    if(m.type==='play'){
+        player.currentTime(m.time);
+        player.play().then(()=>{isPlaying=true;$('pb').textContent='⏸';})
+        .catch(()=>{toast('Собеседник нажал Play! Нажмите ▶️');$('pb').textContent='▶️';});
+    }else if(m.type==='pause'){
+        player.pause();player.currentTime(m.time);isPlaying=false;$('pb').textContent='▶️';
+    }else if(m.type==='seek'){
+        player.currentTime(m.time);
+    }else if(m.type==='load'){
+        $('vu').value=m.url;load();
+    }else if(m.type==='sync'){
+        const diff=Math.abs(player.currentTime()-m.time);
+        if(diff>1)player.currentTime(m.time);
+    }
 }
 
 function tu(){$('url-bar').classList.toggle('on');}
@@ -277,18 +352,12 @@ function tf(){
     if(!document.fullscreenElement)el.requestFullscreen().catch(()=>{});
     else document.exitFullscreen();
 }
-function svv(v){const val=v/100;$('vv').textContent=v+'%';if(vg)vg.gain.value=val;else $('vid').volume=val;}
+function svv(v){const val=v/100;$('vv').textContent=v+'%';if(vg)vg.gain.value=val;else if(player)player.volume(val);}
 function sav(v){const val=v/100;$('av').textContent=v+'%';if(ag)ag.gain.value=val;}
-
-setInterval(()=>{const v=$('vid');if(v.duration){$('pf').style.width=(v.currentTime/v.duration*100)+'%';$('tm').textContent=fmt(v.currentTime)+' / '+fmt(v.duration);}},100);
 
 let hideTimer;
 function rst(){document.body.classList.remove('hid');clearTimeout(hideTimer);if(isPlaying)hideTimer=setTimeout(()=>document.body.classList.add('hid'),4000);}
 document.addEventListener('click',rst);document.addEventListener('touchstart',rst);
-
-$('vid').addEventListener('play',()=>{isPlaying=true;$('pb').textContent='⏸';});
-$('vid').addEventListener('pause',()=>{isPlaying=false;$('pb').textContent='▶️';});
-$('vid').addEventListener('ended',()=>{isPlaying=false;$('pb').textContent='▶️';});
 
 if('wakeLock' in navigator){
     navigator.wakeLock.request('screen').catch(()=>{});
