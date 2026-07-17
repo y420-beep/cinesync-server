@@ -71,7 +71,6 @@ video{width:100%;height:100%;object-fit:contain;background:#000}
 .peer-vol-bar{width:40px;height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden}
 .peer-vol-fill{height:100%;background:#00ff88;width:0%;transition:width .1s}
 
-/* Кнопка открытия панели участников */
 #peers-toggle{position:absolute;top:max(16px,env(safe-area-inset-top));right:12px;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.75);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:none;color:#fff;display:flex;align-items:center;justify-content:center;z-index:50;cursor:pointer;transition:.15s}
 #peers-toggle:active{background:rgba(255,255,255,.15);transform:scale(.92)}
 #peers-toggle .badge-count{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:9px;background:#e50914;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px}
@@ -79,22 +78,21 @@ video{width:100%;height:100%;object-fit:contain;background:#000}
 #peers-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:240;opacity:0;pointer-events:none;transition:opacity .3s}
 #peers-overlay.show{opacity:1;pointer-events:auto}
 
-/* ===== ПАНЕЛИ ===== */
+/* ===== ПАНЕЛИ — УВЕЛИЧЕННЫЕ ОТСТУПЫ ОТ СТАТУС-БАРА ===== */
 .panel{position:fixed;left:16px;right:16px;background:rgba(14,14,22,.96);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);padding:20px;border-radius:20px;z-index:200;border:1px solid rgba(255,255,255,.06);box-shadow:0 25px 50px rgba(0,0,0,.6);transition:transform .35s cubic-bezier(.32,.72,0,1),opacity .25s;opacity:0;pointer-events:none}
 .panel.active{opacity:1;pointer-events:auto}
 
-#url-panel{top:max(70px,env(safe-area-inset-top)+50px);transform:translateY(-20px) scale(.96)}
+#url-panel{top:max(100px,env(safe-area-inset-top)+60px);transform:translateY(-20px) scale(.96)}
 #url-panel.active{transform:translateY(0) scale(1)}
 #url-panel .row{display:flex;gap:10px;align-items:center}
 #url-panel input{flex:1;margin:0;padding:14px 16px;border:1.5px solid #222;border-radius:14px;background:#16161f;color:#fff;font-size:15px;outline:none;-webkit-appearance:none;user-select:text;-webkit-user-select:text}
 #url-panel input:focus{border-color:#e50914}
 #url-panel .btn-load{width:auto;padding:14px 22px;font-size:14px;border-radius:14px;flex-shrink:0}
 
-#vol-panel{top:max(70px,env(safe-area-inset-top)+50px);transform:translateY(-20px) scale(.96)}
+#vol-panel{top:max(100px,env(safe-area-inset-top)+60px);transform:translateY(-20px) scale(.96)}
 #vol-panel.active{transform:translateY(0) scale(1)}
 
-/* Панель скорости воспроизведения */
-#speed-panel{top:max(70px,env(safe-area-inset-top)+50px);transform:translateY(-20px) scale(.96)}
+#speed-panel{top:max(100px,env(safe-area-inset-top)+60px);transform:translateY(-20px) scale(.96)}
 #speed-panel.active{transform:translateY(0) scale(1)}
 .speed-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
 .speed-btn{padding:12px 8px;border-radius:12px;background:rgba(255,255,255,.05);border:1.5px solid transparent;color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:.15s;text-align:center}
@@ -102,8 +100,7 @@ video{width:100%;height:100%;object-fit:contain;background:#000}
 .speed-btn:active{background:rgba(255,255,255,.15);transform:scale(.95)}
 .speed-btn.active{background:rgba(229,9,20,.15);border-color:#e50914;color:#ff4757}
 
-/* Панель поделиться */
-#share-panel{top:max(70px,env(safe-area-inset-top)+50px);transform:translateY(-20px) scale(.96)}
+#share-panel{top:max(100px,env(safe-area-inset-top)+60px);transform:translateY(-20px) scale(.96)}
 #share-panel.active{transform:translateY(0) scale(1)}
 .share-code{font-size:32px;font-weight:800;letter-spacing:4px;text-align:center;color:#e50914;margin:16px 0;background:rgba(229,9,20,.08);padding:16px;border-radius:16px;border:1px dashed rgba(229,9,20,.3)}
 .share-link{font-size:12px;color:#666;text-align:center;margin-bottom:16px;word-break:break-all}
@@ -144,8 +141,8 @@ video{width:100%;height:100%;object-fit:contain;background:#000}
 .ctrl-btn svg{width:20px;height:20px;fill:currentColor}
 .ctrl-btn.big svg{width:24px;height:24px}
 
-/* ===== TOAST ===== */
-#toast-c{position:fixed;top:max(90px,env(safe-area-inset-top)+70px);left:50%;transform:translateX(-50%);z-index:3000;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:90vw}
+/* ===== TOAST — УВЕЛИЧЕННЫЙ ОТСТУП ОТ СТАТУС-БАРА ===== */
+#toast-c{position:fixed;top:max(130px,env(safe-area-inset-top)+100px);left:50%;transform:translateX(-50%);z-index:3000;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:90vw;padding-top:8px}
 .toast{background:rgba(20,20,35,.95);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);padding:12px 20px;border-radius:14px;font-size:14px;border-left:3px solid #e50914;animation:toastIn .25s;max-width:300px;text-align:center;font-weight:500;color:#fff;box-shadow:0 8px 30px rgba(0,0,0,.4)}
 @keyframes toastIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
 
@@ -435,7 +432,7 @@ document.addEventListener('keydown',e=>{if($('main').classList.contains('hidden'
 window.addEventListener('beforeunload',()=>{if(S.syncTimer)clearInterval(S.syncTimer);if(S.reconTimer)clearTimeout(S.reconTimer);cleanupRTC();if(S.ls)S.ls.getTracks().forEach(t=>t.stop());if(S.ws)S.ws.close();});
 }
 
-function init(){$('self-name').textContent=S.myName||'Я';$('self-avatar').textContent=getInitials(S.myName||'Я');videoEl.volume=0.6;initEvents();initProgress();initRanges();initAutoHide();initPeersPanel();initSpeedPanel();initSharePanel();startLoop();reqWake();console.log('CineSync v5 initialized');}
+function init(){$('self-name').textContent=S.myName||'Я';$('self-avatar').textContent=getInitials(S.myName||'Я');videoEl.volume=0.6;initEvents();initProgress();initRanges();initAutoHide();initPeersPanel();initSpeedPanel();initSharePanel();startLoop();reqWake();console.log('CineSync v5.1 initialized');}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 </script>
 </body>
