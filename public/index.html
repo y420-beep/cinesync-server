@@ -15,7 +15,22 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-se
 body{padding-top:var(--safe-top);padding-bottom:var(--safe-bottom)}
 .hidden{display:none!important}
 
-#connect{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:linear-gradient(180deg,#0a0a0f 0%,#12121f 100%);z-index:1000}
+#splash{position:fixed;inset:0;z-index:9999;background:#0a0a0f;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .8s cubic-bezier(.4,0,.2,1),visibility .8s}
+#splash.done{opacity:0;visibility:hidden;pointer-events:none}
+#splash canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.splash-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:24px}
+.splash-logo{font-size:48px;font-weight:800;background:linear-gradient(135deg,#e50914 0%,#ff4757 50%,#e50914 100%);background-size:200% 200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:2px;animation:logoPulse 2s ease-in-out infinite,logoShine 3s ease-in-out infinite}
+@keyframes logoPulse{0%,100%{transform:scale(1);filter:drop-shadow(0 0 20px rgba(229,9,20,.3))}50%{transform:scale(1.05);filter:drop-shadow(0 0 40px rgba(229,9,20,.6))}}
+@keyframes logoShine{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+.splash-sub{font-size:14px;color:#555;letter-spacing:8px;text-transform:uppercase;animation:subFade 2s ease-in-out infinite}
+@keyframes subFade{0%,100%{opacity:.4}50%{opacity:1}}
+.splash-ring{width:48px;height:48px;border:2px solid rgba(229,9,20,.15);border-top-color:#e50914;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.splash-hint{position:absolute;bottom:calc(var(--safe-bottom) + 40px);font-size:12px;color:#333;letter-spacing:2px;text-transform:uppercase;animation:hintPulse 1.5s ease-in-out infinite}
+@keyframes hintPulse{0%,100%{opacity:.3}50%{opacity:.6}}
+
+#connect{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:linear-gradient(180deg,#0a0a0f 0%,#12121f 100%);z-index:1000;opacity:0;transform:translateY(20px);transition:opacity .6s ease,transform .6s ease}
+#connect.visible{opacity:1;transform:translateY(0)}
 .logo{font-size:52px;font-weight:800;background:linear-gradient(135deg,#e50914,#ff4757);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:10px;letter-spacing:-1px}
 .sub{color:#666;font-size:15px;margin-bottom:48px;text-align:center}
 .inp{width:100%;max-width:340px;padding:18px 20px;border:1.5px solid #222;border-radius:16px;background:#16161f;color:#fff;font-size:17px;margin-bottom:12px;outline:none;-webkit-appearance:none;user-select:text;-webkit-user-select:text;transition:border-color .2s}
@@ -46,8 +61,6 @@ video{width:100%;height:100%;object-fit:contain;background:#000}
 
 #badge{position:absolute;top:calc(var(--safe-top) + 8px);left:12px;display:flex;align-items:center;gap:8px;padding:8px 14px;background:rgba(0,0,0,.75);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-radius:20px;font-size:12px;z-index:50;transition:opacity .3s;max-width:calc(100% - 80px);flex-wrap:wrap}
 #badge .dot{width:7px;height:7px;border-radius:50%;background:#00ff88;animation:pulse 2s infinite;flex-shrink:0}
-#badge .room-code{color:#e50914;font-weight:700;font-size:13px;letter-spacing:1px;background:rgba(229,9,20,.1);padding:2px 8px;border-radius:8px;margin-left:4px;cursor:pointer;transition:background .2s}
-#badge .room-code:active{background:rgba(229,9,20,.2)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
 #peers-panel{position:fixed;top:0;bottom:0;left:0;width:280px;background:rgba(10,10,15,.97);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);z-index:250;transform:translateX(-100%);transition:transform .35s cubic-bezier(.32,.72,0,1);border-right:1px solid rgba(255,255,255,.06);padding:calc(var(--safe-top) + 12px) 16px calc(var(--safe-bottom) + 12px);display:flex;flex-direction:column}
@@ -104,7 +117,6 @@ video{width:100%;height:100%;object-fit:contain;background:#000}
 #mic-btn.on{background:#e50914!important;box-shadow:0 0 10px rgba(229,9,20,.3)!important}
 #mic-btn.on svg{fill:#fff}
 @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
-
 #ctrl{position:fixed;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,.95) 0%,rgba(0,0,0,.75) 60%,transparent 100%);padding:16px 16px calc(var(--safe-bottom) + 16px);z-index:150;transition:opacity .3s,transform .3s}
 
 .prog-row{display:flex;align-items:center;gap:12px;margin-bottom:14px}
@@ -134,7 +146,6 @@ video{width:100%;height:100%;object-fit:contain;background:#000}
 #recon{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:500;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px}
 #recon.show{display:flex}
 .spin{width:40px;height:40px;border:3px solid rgba(255,255,255,.08);border-top-color:#e50914;border-radius:50%;animation:spin 1s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
 
 .ui-hidden #ctrl,.ui-hidden #badge,.ui-hidden #peers-toggle{opacity:0;pointer-events:none;transform:translateY(12px)}
 .ui-hidden #ctrl{transform:translateY(20px)}
@@ -151,6 +162,16 @@ video{width:100%;height:100%;object-fit:contain;background:#000}
 </style>
 </head>
 <body>
+
+<div id="splash">
+  <canvas id="star-canvas"></canvas>
+  <div class="splash-content">
+    <div class="splash-logo">CineSync</div>
+    <div class="splash-sub">Смотрите вместе</div>
+    <div class="splash-ring"></div>
+  </div>
+  <div class="splash-hint">Нажмите чтобы продолжить</div>
+</div>
 
 <div id="connect">
 <div class="logo">CineSync</div>
@@ -173,7 +194,6 @@ video{width:100%;height:100%;object-fit:contain;background:#000}
 <div id="badge">
   <div class="dot"></div>
   <span id="bt">Подключено</span>
-  <span class="room-code" id="room-code-display" title="Нажмите, чтобы скопировать"></span>
 </div>
 
 <button id="peers-toggle" title="Участники">
@@ -198,6 +218,12 @@ video{width:100%;height:100%;object-fit:contain;background:#000}
       </div>
     </div>
   </div>
+  
+  <div style="margin-top:12px;padding:14px;border-radius:16px;background:rgba(229,9,20,.06);border:1px solid rgba(229,9,20,.15);text-align:center">
+    <div style="font-size:11px;color:#888;margin-bottom:6px;letter-spacing:1px">КОД КОМНАТЫ</div>
+    <div id="room-code-panel" style="font-size:28px;font-weight:800;letter-spacing:4px;color:#e50914;font-family:monospace"></div>
+  </div>
+  
   <div class="call-controls" style="margin-top:12px;padding:14px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <span style="font-size:12px;color:#777">Голосовой чат</span>
@@ -280,6 +306,95 @@ const $=id=>document.getElementById(id);
 const videoEl=$('vid');
 const WS_URL=(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';
 
+(function initStarField(){
+  const canvas=$('star-canvas');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  let stars=[];
+  let w,h;
+  function resize(){w=canvas.width=window.innerWidth;h=canvas.height=window.innerHeight;}
+  resize();
+  window.addEventListener('resize',resize);
+  
+  class Star{
+    constructor(){this.reset();}
+    reset(){
+      this.x=Math.random()*w;
+      this.y=Math.random()*h;
+      this.size=Math.random()*1.5+.5;
+      this.speedX=(Math.random()-.5)*.3;
+      this.speedY=(Math.random()-.5)*.3;
+      this.opacity=Math.random();
+      this.fadeDir=Math.random()>.5?1:-1;
+      this.fadeSpeed=Math.random()*.008+.003;
+      this.color=Math.random()>.7?'#e50914':(Math.random()>.5?'#ff4757':'#ffffff');
+    }
+    update(){
+      this.x+=this.speedX;
+      this.y+=this.speedY;
+      this.opacity+=this.fadeSpeed*this.fadeDir;
+      if(this.opacity>=1||this.opacity<=.2)this.fadeDir*=-1;
+      if(this.x<0||this.x>w||this.y<0||this.y>h)this.reset();
+    }
+    draw(){
+      ctx.globalAlpha=this.opacity;
+      ctx.fillStyle=this.color;
+      ctx.beginPath();
+      ctx.arc(this.x,this.y,this.size,0,Math.PI*2);
+      ctx.fill();
+      if(this.size>1.2){
+        ctx.globalAlpha=this.opacity*.3;
+        ctx.beginPath();
+        ctx.arc(this.x,this.y,this.size*3,0,Math.PI*2);
+        ctx.fill();
+      }
+    }
+  }
+  
+  for(let i=0;i<80;i++)stars.push(new Star());
+  
+  let animId;
+  function loop(){
+    ctx.clearRect(0,0,w,h);
+    const grad=ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,Math.max(w,h));
+    grad.addColorStop(0,'rgba(229,9,20,.03)');
+    grad.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=grad;
+    ctx.fillRect(0,0,w,h);
+    stars.forEach(s=>{s.update();s.draw();});
+    animId=requestAnimationFrame(loop);
+  }
+  loop();
+  
+  window.addEventListener('splashDone',()=>{
+    cancelAnimationFrame(animId);
+    canvas.style.display='none';
+  });
+})();
+
+(function initSplash(){
+  const splash=$('splash');
+  let dismissed=false;
+  
+  function dismissSplash(){
+    if(dismissed)return;
+    dismissed=true;
+    
+    if('vibrate' in navigator){
+      try{navigator.vibrate([60,40,60]);}catch(e){}
+    }
+    
+    splash.classList.add('done');
+    window.dispatchEvent(new CustomEvent('splashDone'));
+    setTimeout(()=>{
+      $('connect').classList.add('visible');
+    },200);
+  }
+  
+  splash.addEventListener('click',dismissSplash);
+  splash.addEventListener('touchstart',function(e){e.preventDefault();dismissSplash();},{passive:false});
+})();
+
 function genCode(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';return Array.from({length:6},()=>c[Math.floor(Math.random()*c.length)]).join('');}
 function fmt(s){if(!isFinite(s))return'00:00';const m=Math.floor(s/60),sec=Math.floor(s%60);return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');}
 function toast(msg){const c=$('toast-c');while(c.children.length>2)c.removeChild(c.firstChild);const t=document.createElement('div');t.className='toast';t.textContent=msg;c.appendChild(t);setTimeout(()=>{t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(()=>t.remove(),300);},2700);}
@@ -310,13 +425,25 @@ const micBtn=$('mic-btn');if(micBtn)micBtn.addEventListener('click',e=>{e.stopPr
 const volBtn=$('vol-btn');if(volBtn)volBtn.addEventListener('click',e=>{e.stopPropagation();togglePeerVolPanel();});
 let touchStartX=0;document.addEventListener('touchstart',e=>{touchStartX=e.touches[0].clientX;},{passive:true});document.addEventListener('touchend',e=>{const touchEndX=e.changedTouches[0].clientX;if(touchStartX<30&&touchEndX-touchStartX>80&&!$('peers-panel').classList.contains('open')){openPeersPanel();}},{passive:true});}
 
-function toggleFullscreen(){if(!document.fullscreenElement){const el=document.documentElement;if(el.requestFullscreen)el.requestFullscreen();else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();else if(el.msRequestFullscreen)el.msRequestFullscreen();}else{if(document.exitFullscreen)document.exitFullscreen();else if(document.webkitExitFullscreen)document.webkitExitFullscreen();else if(document.msExitFullscreen)document.msExitFullscreen();}}
-function updateFullscreenBtn(){const isFs=!!(document.fullscreenElement||document.webkitFullscreenElement||document.msFullscreenElement);$('icon-fs').style.display=isFs?'none':'block';$('icon-fs-exit').style.display=isFs?'block':'none';}
+function toggleFullscreen(){
+  const vid=$('vid');
+  if(!document.fullscreenElement&&!document.webkitFullscreenElement&&!document.msFullscreenElement){
+    const el=(vid&&vid.readyState>0)?vid:document.documentElement;
+    if(el.requestFullscreen){el.requestFullscreen().catch(()=>{});}
+    else if(el.webkitRequestFullscreen){el.webkitRequestFullscreen();}
+    else if(el.msRequestFullscreen){el.msRequestFullscreen();}
+  }else{
+    if(document.exitFullscreen){document.exitFullscreen().catch(()=>{});}
+    else if(document.webkitExitFullscreen){document.webkitExitFullscreen();}
+    else if(document.msExitFullscreen){document.msExitFullscreen();}
+  }
+}
+function updateFullscreenBtn(){const isFs=!!(document.fullscreenElement||document.webkitFullscreenElement||document.msFullscreenElement);if($('icon-fs'))$('icon-fs').style.display=isFs?'none':'block';if($('icon-fs-exit'))$('icon-fs-exit').style.display=isFs?'block':'none';}
 
 function updateSharePanel(){const code=S.room||'';$('share-code').textContent=code;const link=location.protocol+'//'+location.host+'/?room='+code;$('share-link').textContent=link;}
 function copyToClipboard(text){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>toast('📋 Скопировано!')).catch(()=>fallbackCopy(text));}else{fallbackCopy(text);}}
 function fallbackCopy(text){const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('📋 Скопировано!');}catch(err){toast('❌ Не удалось скопировать');}document.body.removeChild(ta);}
-function initSharePanel(){$('room-code-display').addEventListener('click',()=>{if(S.room)copyToClipboard(S.room);});$('copy-code-btn').addEventListener('click',e=>{e.stopPropagation();if(S.room)copyToClipboard(S.room);});$('copy-link-btn').addEventListener('click',e=>{e.stopPropagation();const link=location.protocol+'//'+location.host+'/?room='+(S.room||'');copyToClipboard(link);});}
+function initSharePanel(){$('copy-code-btn').addEventListener('click',e=>{e.stopPropagation();if(S.room)copyToClipboard(S.room);});$('copy-link-btn').addEventListener('click',e=>{e.stopPropagation();const link=location.protocol+'//'+location.host+'/?room='+(S.room||'');copyToClipboard(link);});}
 
 function initRanges(){
 document.querySelectorAll('.range-wrap').forEach(wrap=>{
@@ -339,9 +466,8 @@ document.addEventListener('mouseup',onUp);
 function connectWS(){if(S.ws){try{S.ws.close();}catch(e){}}S.ws=new WebSocket(WS_URL);S.ws.onopen=()=>{S.reconCount=0;$('recon').classList.remove('show');S.ws.send(JSON.stringify({type:'join',room:S.room,name:S.myName}));};S.ws.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch(err){return;}handleMsg(m);};S.ws.onclose=()=>{$('recon').classList.add('show');scheduleRecon();};S.ws.onerror=()=>showStatus('Ошибка соединения','err');}
 function scheduleRecon(){if(S.reconCount>=10){$('recon').innerHTML='<div style="color:#e50914;text-align:center;padding:20px">Не удалось подключиться.<br>Перезагрузите страницу.</div>';return;}S.reconCount++;const d=Math.min(1000*Math.pow(1.5,S.reconCount-1),30000);S.reconTimer=setTimeout(()=>{connectWS();cleanupRTC();},d);}
 
-function handleMsg(m){switch(m.type){case'joined':$('connect').classList.add('hidden');$('main').classList.remove('hidden');$('room-code-display').textContent=S.room;$('self-name').textContent=S.myName;$('self-avatar').textContent=getInitials(S.myName);$('self-role').textContent='админ';showStatus('Комната '+S.room,'ok');if(m.peers)m.peers.forEach(p=>{if(p!==S.myName){addPeerToPanel(p);addPeer(p);}});if(!S.isHost&&m.peers&&m.peers.length>1){initRTC(false);startCallTimer();}toast(S.isHost?'Комната: '+S.room:'Подключено!');break;case'peer-joined':toast('👤 '+m.name+' подключился');addPeerToPanel(m.name);addPeer(m.name);if(S.isHost)initRTC(true);startCallTimer();break;case'peer-left':toast('👋 '+m.name+' вышел');removePeerFromPanel(m.name);removePeer(m.name);if(S.peers.size===0)stopCallTimer();break;case'offer':case'answer':case'ice-candidate':handleRTC(m);break;case'sync':handleSync(m);break;}}
+function handleMsg(m){switch(m.type){case'joined':$('connect').classList.add('hidden');$('main').classList.remove('hidden');$('room-code-panel').textContent=S.room;$('self-name').textContent=S.myName;$('self-avatar').textContent=getInitials(S.myName);$('self-role').textContent='админ';showStatus('Комната '+S.room,'ok');if(m.peers)m.peers.forEach(p=>{if(p!==S.myName){addPeerToPanel(p);addPeer(p);}});if(!S.isHost&&m.peers&&m.peers.length>1){initRTC(false);startCallTimer();}toast(S.isHost?'Комната: '+S.room:'Подключено!');break;case'peer-joined':toast('👤 '+m.name+' подключился');addPeerToPanel(m.name);addPeer(m.name);if(S.isHost&&S.peers.size>0)initRTC(true);startCallTimer();break;case'peer-left':toast('👋 '+m.name+' вышел');removePeerFromPanel(m.name);removePeer(m.name);if(S.peers.size===0)stopCallTimer();break;case'offer':case'answer':case'ice-candidate':handleRTC(m);break;case'sync':handleSync(m);break;}}
 
-function addPeer(n){}
 function removePeer(n){const a=S.peerAudios.get(n);if(a){a.pause();a.srcObject=null;if(a.parentNode)a.parentNode.removeChild(a);S.peerAudios.delete(n);}}
 function esc(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
 
@@ -355,25 +481,22 @@ async function initRTC(init){if(S.pc)return;S.pc=new RTCPeerConnection({iceServe
   document.body.appendChild(a);
   a.play().catch(()=>{});
   stream.getTracks().forEach(t=>{if(t.kind==='audio')S.peerAudios.set(t.id,a);});
-};S.pc.onicecandidate=e=>{if(e.candidate&&S.ws?.readyState===1)S.ws.send(JSON.stringify({type:'ice-candidate',candidate:e.candidate}));};S.pc.onconnectionstatechange=()=>{if(S.pc.connectionState==='connected'){toast('🎙️ Голосовой чат активен');ensureSpeakerOutput();}if(S.pc.connectionState==='failed'){toast('Соединение разорвано');cleanupRTC();}};if(init){const o=await S.pc.createOffer();await S.pc.setLocalDescription(o);S.ws.send(JSON.stringify({type:'offer',sdp:o}));}}
+};S.pc.onicecandidate=e=>{if(e.candidate&&S.ws?.readyState===1)S.ws.send(JSON.stringify({type:'ice-candidate',candidate:e.candidate}));};S.pc.onconnectionstatechange=()=>{if(S.pc.connectionState==='connected'){toast('🎙️ Голосовой чат активен');}if(S.pc.connectionState==='failed'){toast('Соединение разорвано');cleanupRTC();}};if(init){const o=await S.pc.createOffer();await S.pc.setLocalDescription(o);S.ws.send(JSON.stringify({type:'offer',sdp:o}));}}
 function setupDC(){if(!S.dc)return;if(S.syncTimer)clearInterval(S.syncTimer);S.syncTimer=setInterval(()=>{if(videoEl&&!videoEl.paused&&videoEl.readyState>=2)sendSync({type:'sync',t:videoEl.currentTime,p:true});},3000);S.dc.onmessage=e=>{try{applySync(JSON.parse(e.data));}catch(err){}};S.dc.onclose=()=>{if(S.syncTimer){clearInterval(S.syncTimer);S.syncTimer=null;}};}
 function cleanupRTC(){if(S.syncTimer){clearInterval(S.syncTimer);S.syncTimer=null;}if(S.dc){try{S.dc.close();}catch(e){}S.dc=null;}if(S.pc){S.pc.getSenders().forEach(s=>{if(s.track){try{s.track.stop();}catch(e){}}});S.pc.close();S.pc=null;}S.peerAudios.forEach(a=>{a.pause();a.srcObject=null;if(a.parentNode)a.parentNode.removeChild(a);});S.peerAudios.clear();}
 function setupAudio(){if(!S.ls||S.audioCtx)return;S.audioCtx=new(window.AudioContext||window.webkitAudioContext)();if(S.audioCtx.state==='suspended')S.audioCtx.resume().catch(()=>{});S.mg=S.audioCtx.createGain();S.mg.connect(S.audioCtx.destination);const src=S.audioCtx.createMediaStreamSource(S.ls);S.ag=S.audioCtx.createGain();S.ag.gain.value=S.pendingVoiceVol||0.8;const f=S.audioCtx.createBiquadFilter();f.type='bandpass';f.frequency.value=1000;f.Q.value=1;src.connect(f);f.connect(S.ag);S.ag.connect(S.mg);const unlk=()=>{if(S.audioCtx&&S.audioCtx.state==='suspended')S.audioCtx.resume().catch(()=>{});};document.addEventListener('click',unlk,{once:true});document.addEventListener('touchstart',unlk,{once:true});}
 
-function ensureSpeakerOutput(){
-  if(typeof AudioContext!=='undefined'&&S.audioCtx){
-    const dest=S.audioCtx.createMediaStreamDestination();
-    const osc=S.audioCtx.createOscillator();
-    osc.frequency.value=0;
-    const g=S.audioCtx.createGain();
-    g.gain.value=0.001;
-    osc.connect(g);g.connect(dest);
-    osc.start();setTimeout(()=>osc.stop(),100);
-  }
-}
 async function handleRTC(m){if(!S.pc)return;try{if(m.type==='offer'){await S.pc.setRemoteDescription(m.sdp);const a=await S.pc.createAnswer();await S.pc.setLocalDescription(a);S.ws.send(JSON.stringify({type:'answer',sdp:a}));}else if(m.type==='answer')await S.pc.setRemoteDescription(m.sdp);else if(m.type==='ice-candidate'&&m.candidate)await S.pc.addIceCandidate(m.candidate);}catch(e){console.error('RTC:',e);}}
 
-function loadVideo(){const url=$('vu').value.trim();if(!url)return;videoEl.pause();videoEl.removeAttribute('src');videoEl.load();$('ph').style.display='flex';videoEl.style.display='none';$('pf').style.width='0%';$('pbu').style.width='0%';$('tm').textContent='00:00 / 00:00';videoEl.src=url;videoEl.load();videoEl.oncanplay=()=>{$('ph').style.display='none';videoEl.style.display='block';videoEl.muted=false;const vol=parseInt($('vv').textContent)/100;videoEl.volume=vol;videoEl.muted=vol===0;toast('🎬 Видео готово! Нажмите ▶️');sendSync({type:'load',url:url});};videoEl.onerror=()=>{let msg='Ошибка загрузки';if(videoEl.error){switch(videoEl.error.code){case 1:msg='Прервано';break;case 2:msg='Ошибка сети';break;case 3:msg='Формат не поддерживается';break;case 4:msg='Невозможно воспроизвести';break;}}toast('❌ '+msg);};videoEl.onwaiting=()=>$('buffering').classList.add('show');videoEl.onplaying=()=>$('buffering').classList.remove('show');videoEl.oncanplaythrough=()=>$('buffering').classList.remove('show');videoEl.onprogress=()=>{if(videoEl.buffered.length>0&&videoEl.duration)$('pbu').style.width=(videoEl.buffered.end(videoEl.buffered.length-1)/videoEl.duration*100)+'%';};closeAllPanels();}
+function loadVideo(){const url=$('vu').value.trim();if(!url)return;videoEl.pause();videoEl.removeAttribute('src');videoEl.load();$('ph').style.display='flex';videoEl.style.display='none';$('pf').style.width='0%';$('pbu').style.width='0%';$('tm').textContent='00:00 / 00:00';videoEl.src=url;videoEl.load();
+const onCanPlay=()=>{$('ph').style.display='none';videoEl.style.display='block';videoEl.muted=false;const vol=parseInt($('vv').textContent)/100;videoEl.volume=vol;videoEl.muted=vol===0;toast('🎬 Видео готово! Нажмите ▶️');sendSync({type:'load',url:url});};
+videoEl.addEventListener('canplay',onCanPlay,{once:true});
+videoEl.onerror=()=>{let msg='Ошибка загрузки';if(videoEl.error){switch(videoEl.error.code){case 1:msg='Прервано';break;case 2:msg='Ошибка сети';break;case 3:msg='Формат не поддерживается';break;case 4:msg='Невозможно воспроизвести';break;}}toast('❌ '+msg);};
+videoEl.onwaiting=()=>$('buffering').classList.add('show');
+videoEl.onplaying=()=>$('buffering').classList.remove('show');
+videoEl.oncanplaythrough=()=>$('buffering').classList.remove('show');
+videoEl.onprogress=()=>{if(videoEl.buffered.length>0&&videoEl.duration)$('pbu').style.width=(videoEl.buffered.end(videoEl.buffered.length-1)/videoEl.duration*100)+'%';};
+closeAllPanels();}
 
 function togglePlay(){if(!videoEl.src){toast('Сначала загрузите видео');return;}if(videoEl.paused){videoEl.play().then(()=>{S.isPlaying=true;updatePlayBtn(true);sendSync({type:'play',time:videoEl.currentTime});toast('▶️ Воспроизведение');}).catch(()=>toast('Нажмите на видео для старта'));}else{videoEl.pause();S.isPlaying=false;updatePlayBtn(false);sendSync({type:'pause',time:videoEl.currentTime});toast('⏸ Пауза');}}
 function updatePlayBtn(p){$('icon-play').style.display=p?'none':'block';$('icon-pause').style.display=p?'block':'none';}
@@ -402,6 +525,8 @@ $('vu').addEventListener('keydown',e=>{if(e.key==='Enter')loadVideo();});
 $('pb').addEventListener('click',e=>{e.stopPropagation();togglePlay();});
 $('ub').addEventListener('click',e=>{e.stopPropagation();toggleUrlPanel();});
 $('fs-btn').addEventListener('click',e=>{e.stopPropagation();toggleFullscreen();});
+videoEl.addEventListener('webkitbeginfullscreen',()=>{if($('icon-fs'))$('icon-fs').style.display='none';if($('icon-fs-exit'))$('icon-fs-exit').style.display='block';});
+videoEl.addEventListener('webkitendfullscreen',()=>{if($('icon-fs'))$('icon-fs').style.display='block';if($('icon-fs-exit'))$('icon-fs-exit').style.display='none';});
 $('load-btn').addEventListener('click',e=>{e.stopPropagation();loadVideo();});
 document.addEventListener('click',e=>{if(!e.target.closest('.panel')&&!e.target.closest('.ctrl-btn')&&!e.target.closest('#peers-panel')&&!e.target.closest('#peers-toggle'))closeAllPanels();});
 document.addEventListener('fullscreenchange',updateFullscreenBtn);
@@ -415,7 +540,7 @@ function init(){
   document.documentElement.style.setProperty('--safe-top',safeTop+'px');
   const safeBottom=Math.max(16,parseInt(getComputedStyle(document.documentElement).getPropertyValue('--safe-bottom'))||0);
   document.documentElement.style.setProperty('--safe-bottom',safeBottom+'px');
-  $('self-name').textContent=S.myName||'Я';$('self-avatar').textContent=getInitials(S.myName||'Я');videoEl.volume=0.6;initEvents();initProgress();initRanges();initAutoHide();initPeersPanel();initSharePanel();startLoop();reqWake();console.log('CineSync v5.4 initialized');
+  $('self-name').textContent=S.myName||'Я';$('self-avatar').textContent=getInitials(S.myName||'Я');videoEl.volume=0.6;initEvents();initProgress();initRanges();initAutoHide();initPeersPanel();initSharePanel();startLoop();reqWake();console.log('CineSync v5.8 initialized');
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 </script>
