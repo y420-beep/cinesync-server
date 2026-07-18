@@ -182,7 +182,7 @@ video{width:100%;height:100%;object-fit:contain;background:#000}
 #recon.show{display:flex}
 .spin{width:40px;height:40px;border:3px solid rgba(255,255,255,.08);border-top-color:#e50914;border-radius:50%;animation:spin 1s linear infinite}
 
-.ui-hidden #ctrl,.ui-hidden #badge,.ui-hidden #peers-toggle{opacity:0;pointer-events:none;transform:translateY(12px)}
+.ui-hidden #ctrl,.ui-hidden #badge,.ui-hidden #peers-toggle,.ui-hidden #movies-btn{opacity:0;pointer-events:none;transform:translateY(12px)}
 .ui-hidden #ctrl{transform:translateY(20px)}
 
 #scrub-tip{position:fixed;bottom:calc(var(--safe-bottom) + 110px);background:rgba(0,0,0,.9);padding:6px 12px;border-radius:10px;font-size:13px;font-variant-numeric:tabular-nums;opacity:0;transition:opacity .15s;pointer-events:none;z-index:180;transform:translateX(-50%);color:#fff}
@@ -383,12 +383,14 @@ video{width:100%;height:100%;object-fit:contain;background:#000}
 
 <script>
 'use strict';
-const S={ws:null,pc:null,dc:null,ls:null,room:'',myName:'',isHost:false,isPlaying:false,isMicOn:false,audioCtx:null,ag:null,mg:null,syncTimer:null,reconTimer:null,reconCount:0,hideTimer:null,isDragging:false,peerAudios:new Map(),pendingVoiceVol:0.8,wakeLock:null,peers:new Set(),callStartTime:null,callTimerInterval:null,currentTab:'tmdb',ytPlayer:null,isYouTube:false};
+
+const S={ws:null,pc:null,dc:null,ls:null,room:'',myName:'',isHost:false,isPlaying:false,isMicOn:false,audioCtx:null,ag:null,mg:null,syncTimer:null,reconTimer:null,reconCount:0,hideTimer:null,isDragging:false,peerAudios:new Map(),pendingVoiceVol:0.8,wakeLock:null,peers:new Set(),callStartTime:null,callTimerInterval:null,currentTab:'tmdb',ytPlayer:null,isYouTube:false,remoteAudioEl:null,vadInterval:null};
 const $=id=>document.getElementById(id);
 const videoEl=$('vid');
 const ytEl=$('yt-player');
 const WS_URL=(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';
 
+/* ===== STAR FIELD SPLASH ===== */
 (function initStarField(){
   const canvas=$('star-canvas');
   if(!canvas)return;
@@ -455,6 +457,7 @@ const WS_URL=(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws'
   });
 })();
 
+/* ===== SPLASH SCREEN ===== */
 (function initSplash(){
   const splash=$('splash');
   let dismissed=false;
@@ -491,24 +494,97 @@ function closeMoviesPanel(){$('movies-panel').classList.remove('active');}
 function openPeersPanel(){$('peers-panel').classList.add('open');$('peers-overlay').classList.add('show');}
 function closePeersPanel(){$('peers-panel').classList.remove('open');$('peers-overlay').classList.remove('show');}
 function togglePeersPanel(){if($('peers-panel').classList.contains('open'))closePeersPanel();else openPeersPanel();}
-function updatePeersCount(){const count=S.peers.size+1;$('peers-count').textContent=count;$('peers-count').style.display=count>1?'flex':'none';$('peers-count-panel').textContent=count;}
+
+// FIX: Use visibility instead of flex for span inside button
+function updatePeersCount(){
+  const count=S.peers.size+1;
+  $('peers-count').textContent=count;
+  $('peers-count').style.display=count>1?'inline-flex':'none';
+  $('peers-count-panel').textContent=count;
+}
+
 function getInitials(name){return name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);}
 
-function addPeerToPanel(name){if($('peer-'+name))return;const el=document.createElement('div');el.className='peer-item';el.id='peer-'+name;el.dataset.n=name;el.innerHTML='<div class="peer-avatar">'+esc(getInitials(name))+'</div><div class="peer-info"><div class="peer-name">'+esc(name)+'</div><div class="peer-status online">гость</div></div><div class="peer-vol"><div class="peer-vol-bar"><div class="peer-vol-fill" id="pv-'+esc(name)+'"></div></div></div>';$('peers-list').appendChild(el);S.peers.add(name);updatePeersCount();}
-function removePeerFromPanel(name){const el=$('peer-'+name);if(el)el.remove();S.peers.delete(name);updatePeersCount();}
-function setPeerTalking(name,isTalking){const el=$('peer-'+name);if(el)el.classList.toggle('talking',isTalking);}
-function updatePeerVolume(name,vol){const bar=$('pv-'+name);if(bar)bar.style.width=(vol*100)+'%';}
+/* ===== PEER PANEL FUNCTIONS ===== */
+function peerId(name){return 'peer-'+name.replace(/[^a-zA-Z0-9_-]/g,'_');}
+function volId(name){return 'pv-'+name.replace(/[^a-zA-Z0-9_-]/g,'_');}
 
-function startCallTimer(){if(S.callTimerInterval)return;S.callStartTime=Date.now();S.callTimerInterval=setInterval(()=>{const elapsed=Math.floor((Date.now()-S.callStartTime)/1000);const m=String(Math.floor(elapsed/60)).padStart(2,'0');const s=String(elapsed%60).padStart(2,'0');const el=$('call-timer');if(el)el.textContent=m+':'+s;},1000);}
-function stopCallTimer(){if(S.callTimerInterval){clearInterval(S.callTimerInterval);S.callTimerInterval=null;}S.callStartTime=null;const el=$('call-timer');if(el)el.textContent='00:00';}
+function addPeerToPanel(name){
+  const id=peerId(name);
+  if($(id))return;
+  const el=document.createElement('div');
+  el.className='peer-item';
+  el.id=id;
+  el.dataset.n=name;
+  el.innerHTML='<div class="peer-avatar">'+esc(getInitials(name))+'</div><div class="peer-info"><div class="peer-name">'+esc(name)+'</div><div class="peer-status online">гость</div></div><div class="peer-vol"><div class="peer-vol-bar"><div class="peer-vol-fill" id="'+volId(name)+'"></div></div></div>';
+  $('peers-list').appendChild(el);
+  S.peers.add(name);
+  updatePeersCount();
+}
+
+function removePeerFromPanel(name){
+  const el=$(peerId(name));
+  if(el)el.remove();
+  S.peers.delete(name);
+  updatePeersCount();
+}
+
+function setPeerTalking(name,isTalking){
+  const el=$(peerId(name));
+  if(el)el.classList.toggle('talking',isTalking);
+}
+
+function updatePeerVolume(name,vol){
+  const bar=$(volId(name));
+  if(bar)bar.style.width=(vol*100)+'%';
+}
+
+/* ===== CALL TIMER ===== */
+function startCallTimer(){
+  if(S.callTimerInterval)return;
+  S.callStartTime=Date.now();
+  S.callTimerInterval=setInterval(()=>{
+    const elapsed=Math.floor((Date.now()-S.callStartTime)/1000);
+    const m=String(Math.floor(elapsed/60)).padStart(2,'0');
+    const s=String(elapsed%60).padStart(2,'0');
+    const el=$('call-timer');
+    if(el)el.textContent=m+':'+s;
+  },1000);
+}
+
+function stopCallTimer(){
+  if(S.callTimerInterval){
+    clearInterval(S.callTimerInterval);
+    S.callTimerInterval=null;
+  }
+  S.callStartTime=null;
+  const el=$('call-timer');
+  if(el)el.textContent='00:00';
+}
+
 function resetCallTimer(){stopCallTimer();}
 
-function togglePeerVolPanel(){const p=$('panel-vol');if(!p)return;if(p.style.display==='none'){p.style.display='block';p.style.animation='fadeIn .2s';}else{p.style.display='none';}}
+function togglePeerVolPanel(){
+  const p=$('panel-vol');
+  if(!p)return;
+  if(p.style.display==='none'){p.style.display='block';p.style.animation='fadeIn .2s';}else{p.style.display='none';}
+}
 
-function initPeersPanel(){$('peers-toggle').addEventListener('click',e=>{e.stopPropagation();togglePeersPanel();});$('peers-close').addEventListener('click',e=>{e.stopPropagation();closePeersPanel();});$('peers-overlay').addEventListener('click',closePeersPanel);
-const micBtn=$('mic-btn');if(micBtn)micBtn.addEventListener('click',e=>{e.stopPropagation();toggleMic();});
-const volBtn=$('vol-btn');if(volBtn)volBtn.addEventListener('click',e=>{e.stopPropagation();togglePeerVolPanel();});
-let touchStartX=0;document.addEventListener('touchstart',e=>{touchStartX=e.touches[0].clientX;},{passive:true});document.addEventListener('touchend',e=>{const touchEndX=e.changedTouches[0].clientX;if(touchStartX<30&&touchEndX-touchStartX>80&&!$('peers-panel').classList.contains('open')){openPeersPanel();}},{passive:true});}
+function initPeersPanel(){
+  $('peers-toggle').addEventListener('click',e=>{e.stopPropagation();togglePeersPanel();});
+  $('peers-close').addEventListener('click',e=>{e.stopPropagation();closePeersPanel();});
+  $('peers-overlay').addEventListener('click',closePeersPanel);
+  const micBtn=$('mic-btn');
+  if(micBtn)micBtn.addEventListener('click',e=>{e.stopPropagation();toggleMic();});
+  const volBtn=$('vol-btn');
+  if(volBtn)volBtn.addEventListener('click',e=>{e.stopPropagation();togglePeerVolPanel();});
+  let touchStartX=0;
+  document.addEventListener('touchstart',e=>{touchStartX=e.touches[0].clientX;},{passive:true});
+  document.addEventListener('touchend',e=>{
+    const touchEndX=e.changedTouches[0].clientX;
+    if(touchStartX<30&&touchEndX-touchStartX>80&&!$('peers-panel').classList.contains('open')){openPeersPanel();}
+  },{passive:true});
+}
 
 function toggleFullscreen(){
   const main=$('main');
@@ -523,88 +599,723 @@ function toggleFullscreen(){
     else if(document.msExitFullscreen){document.msExitFullscreen();}
   }
 }
-function updateFullscreenBtn(){const isFs=!!(document.fullscreenElement||document.webkitFullscreenElement||document.msFullscreenElement);if($('icon-fs'))$('icon-fs').style.display=isFs?'none':'block';if($('icon-fs-exit'))$('icon-fs-exit').style.display=isFs?'block':'none';}
 
-function updateSharePanel(){const code=S.room||'';$('share-code').textContent=code;const link=location.protocol+'//'+location.host+'/?room='+code;$('share-link').textContent=link;}
-function copyToClipboard(text){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>toast('&#128203; Скопировано!')).catch(()=>fallbackCopy(text));}else{fallbackCopy(text);}}
-function fallbackCopy(text){const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('&#128203; Скопировано!');}catch(err){toast('&#10060; Не удалось скопировать');}document.body.removeChild(ta);}
-function initSharePanel(){$('copy-code-btn').addEventListener('click',e=>{e.stopPropagation();if(S.room)copyToClipboard(S.room);});$('copy-link-btn').addEventListener('click',e=>{e.stopPropagation();const link=location.protocol+'//'+location.host+'/?room='+(S.room||'');copyToClipboard(link);});}
+function updateFullscreenBtn(){
+  const isFs=!!(document.fullscreenElement||document.webkitFullscreenElement||document.msFullscreenElement);
+  if($('icon-fs'))$('icon-fs').style.display=isFs?'none':'block';
+  if($('icon-fs-exit'))$('icon-fs-exit').style.display=isFs?'block':'none';
+}
+
+function updateSharePanel(){
+  const code=S.room||'';
+  $('share-code').textContent=code;
+  const link=location.protocol+'//'+location.host+'/?room='+code;
+  $('share-link').textContent=link;
+}
+
+function copyToClipboard(text){
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(()=>toast('&#128203; Скопировано!')).catch(()=>fallbackCopy(text));
+  }else{fallbackCopy(text);}
+}
+
+function fallbackCopy(text){
+  const ta=document.createElement('textarea');
+  ta.value=text;
+  ta.style.position='fixed';
+  ta.style.opacity='0';
+  document.body.appendChild(ta);
+  ta.select();
+  try{document.execCommand('copy');toast('&#128203; Скопировано!');}catch(err){toast('&#10060; Не удалось скопировать');}
+  document.body.removeChild(ta);
+}
+
+function initSharePanel(){
+  $('copy-code-btn').addEventListener('click',e=>{e.stopPropagation();if(S.room)copyToClipboard(S.room);});
+  $('copy-link-btn').addEventListener('click',e=>{e.stopPropagation();const link=location.protocol+'//'+location.host+'/?room='+(S.room||'');copyToClipboard(link);});
+}
 
 function initRanges(){
-document.querySelectorAll('.range-wrap').forEach(wrap=>{
-const track=wrap.querySelector('.range-track'),fill=wrap.querySelector('.range-fill'),thumb=wrap.querySelector('.range-thumb'),target=wrap.dataset.target;
-let dragging=false;
-function setFromX(cx){const rect=track.getBoundingClientRect();let pct=Math.max(0,Math.min(1,(cx-rect.left)/rect.width));const r=Math.round(pct*100);fill.style.width=r+'%';thumb.style.left=r+'%';
-if(target==='vid'){$('vv').textContent=r+'%';videoEl.volume=pct;videoEl.muted=pct===0;}
-else if(target==='voice'){$('av').textContent=r+'%';S.pendingVoiceVol=pct;if(S.ag)S.ag.gain.value=pct;}}
-function onDown(e){e.preventDefault();e.stopPropagation();dragging=true;wrap.classList.add('drag');setFromX(e.touches?e.touches[0].clientX:e.clientX);}
-function onMove(e){if(!dragging)return;e.preventDefault();setFromX(e.touches?e.touches[0].clientX:e.clientX);}
-function onUp(e){if(!dragging)return;dragging=false;wrap.classList.remove('drag');}
-wrap.addEventListener('touchstart',onDown,{passive:false});
-wrap.addEventListener('mousedown',onDown);
-document.addEventListener('touchmove',onMove,{passive:false});
-document.addEventListener('mousemove',onMove);
-document.addEventListener('touchend',onUp);
-document.addEventListener('mouseup',onUp);
-});}
+  document.querySelectorAll('.range-wrap').forEach(wrap=>{
+    const track=wrap.querySelector('.range-track'),fill=wrap.querySelector('.range-fill'),thumb=wrap.querySelector('.range-thumb'),target=wrap.dataset.target;
+    let dragging=false;
+    function setFromX(cx){
+      const rect=track.getBoundingClientRect();
+      let pct=Math.max(0,Math.min(1,(cx-rect.left)/rect.width));
+      const r=Math.round(pct*100);
+      fill.style.width=r+'%';
+      thumb.style.left=r+'%';
+      if(target==='vid'){
+        $('vv').textContent=r+'%';
+        videoEl.volume=pct;
+        videoEl.muted=pct===0;
+      }else if(target==='voice'){
+        $('av').textContent=r+'%';
+        S.pendingVoiceVol=pct;
+        if(S.ag)S.ag.gain.value=pct;
+        // Also update remote audio volume
+        if(S.remoteAudioEl)S.remoteAudioEl.volume=pct;
+      }
+    }
+    function onDown(e){e.preventDefault();e.stopPropagation();dragging=true;wrap.classList.add('drag');setFromX(e.touches?e.touches[0].clientX:e.clientX);}
+    function onMove(e){if(!dragging)return;e.preventDefault();setFromX(e.touches?e.touches[0].clientX:e.clientX);}
+    function onUp(e){if(!dragging)return;dragging=false;wrap.classList.remove('drag');}
+    wrap.addEventListener('touchstart',onDown,{passive:false});
+    wrap.addEventListener('mousedown',onDown);
+    document.addEventListener('touchmove',onMove,{passive:false});
+    document.addEventListener('mousemove',onMove);
+    document.addEventListener('touchend',onUp);
+    document.addEventListener('mouseup',onUp);
+  });
+}
 
-function connectWS(){if(S.ws){try{S.ws.close();}catch(e){}}S.ws=new WebSocket(WS_URL);S.ws.onopen=()=>{S.reconCount=0;$('recon').classList.remove('show');S.ws.send(JSON.stringify({type:'join',room:S.room,name:S.myName}));};S.ws.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch(err){return;}handleMsg(m);};S.ws.onclose=()=>{$('recon').classList.add('show');scheduleRecon();};S.ws.onerror=()=>showStatus('Ошибка соединения','err');}
-function scheduleRecon(){if(S.reconCount>=10){$('recon').innerHTML='<div style="color:#e50914;text-align:center;padding:20px">Не удалось подключиться.<br>Перезагрузите страницу.</div>';return;}S.reconCount++;const d=Math.min(1000*Math.pow(1.5,S.reconCount-1),30000);S.reconTimer=setTimeout(()=>{connectWS();cleanupRTC();},d);}
+function connectWS(){
+  if(S.ws){try{S.ws.close();}catch(e){}}
+  S.ws=new WebSocket(WS_URL);
+  S.ws.onopen=()=>{
+    S.reconCount=0;
+    $('recon').classList.remove('show');
+    S.ws.send(JSON.stringify({type:'join',room:S.room,name:S.myName}));
+  };
+  S.ws.onmessage=e=>{
+    let m;
+    try{m=JSON.parse(e.data);}catch(err){return;}
+    handleMsg(m);
+  };
+  S.ws.onclose=()=>{
+    $('recon').classList.add('show');
+    scheduleRecon();
+  };
+  S.ws.onerror=()=>showStatus('Ошибка соединения','err');
+}
 
-function handleMsg(m){switch(m.type){case'joined':$('connect').classList.add('hidden');$('main').classList.remove('hidden');$('room-code-panel').textContent=S.room;$('self-name').textContent=S.myName;$('self-avatar').textContent=getInitials(S.myName);$('self-role').textContent='админ';showStatus('Комната '+S.room,'ok');if(m.peers)m.peers.forEach(p=>{if(p!==S.myName){addPeerToPanel(p);addPeer(p);}});if(!S.isHost&&m.peers&&m.peers.length>1){initRTC(false);startCallTimer();}toast(S.isHost?'Комната: '+S.room:'Подключено!');break;case'peer-joined':toast('&#128100; '+m.name+' подключился');addPeerToPanel(m.name);addPeer(m.name);if(S.isHost&&S.peers.size>0)initRTC(true);startCallTimer();break;case'peer-left':toast('&#128075; '+m.name+' вышел');removePeerFromPanel(m.name);removePeer(m.name);if(S.peers.size===0)stopCallTimer();break;case'offer':case'answer':case'ice-candidate':handleRTC(m);break;case'sync':handleSync(m);break;}}
+function scheduleRecon(){
+  if(S.reconCount>=10){
+    $('recon').innerHTML='<div style="color:#e50914;text-align:center;padding:20px">Не удалось подключиться.<br>Перезагрузите страницу.</div>';
+    return;
+  }
+  S.reconCount++;
+  const d=Math.min(1000*Math.pow(1.5,S.reconCount-1),30000);
+  S.reconTimer=setTimeout(()=>{connectWS();cleanupRTC();},d);
+}
 
-function removePeer(n){const a=S.peerAudios.get(n);if(a){a.pause();a.srcObject=null;if(a.parentNode)a.parentNode.removeChild(a);S.peerAudios.delete(n);}}
+function handleMsg(m){
+  switch(m.type){
+    case 'joined':
+      $('connect').classList.add('hidden');
+      $('main').classList.remove('hidden');
+      $('room-code-panel').textContent=S.room;
+      $('self-name').textContent=S.myName;
+      $('self-avatar').textContent=getInitials(S.myName);
+      $('self-role').textContent=S.isHost?'админ':'гость';
+      showStatus('Комната '+S.room,'ok');
+      if(m.peers){
+        m.peers.forEach(p=>{
+          if(p!==S.myName){
+            addPeerToPanel(p);
+          }
+        });
+      }
+      // Initialize RTC for ALL participants when there are other peers
+      if(m.peers && m.peers.length>1){
+        initRTC(S.isHost);
+        startCallTimer();
+      }
+      toast(S.isHost?'Комната: '+S.room:'Подключено!');
+      break;
+    case 'peer-joined':
+      toast('&#128100; '+m.name+' подключился');
+      addPeerToPanel(m.name);
+      // Start/restart timer when any peer joins
+      if(!S.callTimerInterval){
+        initRTC(S.isHost);
+        startCallTimer();
+      }
+      break;
+    case 'peer-left':
+      toast('&#128075; '+m.name+' вышел');
+      removePeerFromPanel(m.name);
+      removePeerAudio();
+      if(S.peers.size===0){
+        stopCallTimer();
+      }
+      break;
+    case 'offer':
+    case 'answer':
+    case 'ice-candidate':
+      handleRTC(m);
+      break;
+    case 'sync':
+      handleSync(m);
+      break;
+  }
+}
+
+/* ===== WEBRTC - COMPLETELY REWRITTEN ===== */
+// This app uses a single RTCPeerConnection per room (1:1 or simple mesh via server)
+// Key fixes:
+// 1. No local audio playback (prevents echo)
+// 2. Single remote audio element tracked properly
+// 3. AudioContext cleanup on disconnect
+// 4. Voice activity detection using shared analyser
+
+function removePeerAudio(){
+  // Clean up remote audio element
+  if(S.remoteAudioEl){
+    S.remoteAudioEl.pause();
+    S.remoteAudioEl.srcObject=null;
+    if(S.remoteAudioEl.parentNode)S.remoteAudioEl.parentNode.removeChild(S.remoteAudioEl);
+    S.remoteAudioEl=null;
+  }
+  // Stop VAD
+  if(S.vadInterval){
+    clearInterval(S.vadInterval);
+    S.vadInterval=null;
+  }
+  // Reset all peer talking states
+  S.peers.forEach(name=>setPeerTalking(name,false));
+}
+
 function esc(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
 
-async function initRTC(init){if(S.pc)return;S.pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]});if(init){S.dc=S.pc.createDataChannel('sync',{ordered:true});setupDC();}else S.pc.ondatachannel=e=>{S.dc=e.channel;setupDC();};if(!S.ls){try{S.ls=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});setupAudio();}catch(e){toast('Разрешите доступ к микрофону');}}if(S.ls)S.ls.getTracks().forEach(t=>S.pc.addTrack(t,S.ls));S.pc.ontrack=e=>{
-  const stream=e.streams[0];
-  const a=document.createElement('audio');
-  a.srcObject=stream;
-  a.autoplay=true;
-  a.playsInline=true;
-  a.style.display='none';
-  document.body.appendChild(a);
-  a.play().catch(()=>{});
-  stream.getTracks().forEach(t=>{if(t.kind==='audio')S.peerAudios.set(t.id,a);});
-};S.pc.onicecandidate=e=>{if(e.candidate&&S.ws?.readyState===1)S.ws.send(JSON.stringify({type:'ice-candidate',candidate:e.candidate}));};S.pc.onconnectionstatechange=()=>{if(S.pc.connectionState==='connected'){toast('&#127908; Голосовой чат активен');}if(S.pc.connectionState==='failed'){toast('Соединение разорвано');cleanupRTC();}};if(init){const o=await S.pc.createOffer();await S.pc.setLocalDescription(o);S.ws.send(JSON.stringify({type:'offer',sdp:o}));}}
-function setupDC(){if(!S.dc)return;if(S.syncTimer)clearInterval(S.syncTimer);S.syncTimer=setInterval(()=>{if(!S.isYouTube&&videoEl&&!videoEl.paused&&videoEl.readyState>=2)sendSync({type:'sync',t:videoEl.currentTime,p:true});},3000);S.dc.onmessage=e=>{try{applySync(JSON.parse(e.data));}catch(err){}};S.dc.onclose=()=>{if(S.syncTimer){clearInterval(S.syncTimer);S.syncTimer=null;}};}
-function cleanupRTC(){if(S.syncTimer){clearInterval(S.syncTimer);S.syncTimer=null;}if(S.dc){try{S.dc.close();}catch(e){}S.dc=null;}if(S.pc){S.pc.getSenders().forEach(s=>{if(s.track){try{s.track.stop();}catch(e){}}});S.pc.close();S.pc=null;}S.peerAudios.forEach(a=>{a.pause();a.srcObject=null;if(a.parentNode)a.parentNode.removeChild(a);});S.peerAudios.clear();}
-function setupAudio(){if(!S.ls||S.audioCtx)return;S.audioCtx=new(window.AudioContext||window.webkitAudioContext)();if(S.audioCtx.state==='suspended')S.audioCtx.resume().catch(()=>{});S.mg=S.audioCtx.createGain();S.mg.connect(S.audioCtx.destination);const src=S.audioCtx.createMediaStreamSource(S.ls);S.ag=S.audioCtx.createGain();S.ag.gain.value=S.pendingVoiceVol||0.8;const f=S.audioCtx.createBiquadFilter();f.type='bandpass';f.frequency.value=1000;f.Q.value=1;src.connect(f);f.connect(S.ag);S.ag.connect(S.mg);const unlk=()=>{if(S.audioCtx&&S.audioCtx.state==='suspended')S.audioCtx.resume().catch(()=>{});};document.addEventListener('click',unlk,{once:true});document.addEventListener('touchstart',unlk,{once:true});}
+async function initRTC(init){
+  if(S.pc)return;
 
-async function handleRTC(m){if(!S.pc)return;try{if(m.type==='offer'){await S.pc.setRemoteDescription(m.sdp);const a=await S.pc.createAnswer();await S.pc.setLocalDescription(a);S.ws.send(JSON.stringify({type:'answer',sdp:a}));}else if(m.type==='answer')await S.pc.setRemoteDescription(m.sdp);else if(m.type==='ice-candidate'&&m.candidate)await S.pc.addIceCandidate(m.candidate);}catch(e){console.error('RTC:',e);}}
+  S.pc=new RTCPeerConnection({
+    iceServers:[
+      {urls:'stun:stun.l.google.com:19302'},
+      {urls:'stun:stun1.l.google.com:19302'}
+    ]
+  });
 
-function stopYouTube(){S.isYouTube=false;ytEl.style.display='none';ytEl.src='';videoEl.style.display='block';}
+  if(init){
+    S.dc=S.pc.createDataChannel('sync',{ordered:true});
+    setupDC();
+  }else{
+    S.pc.ondatachannel=e=>{
+      S.dc=e.channel;
+      setupDC();
+    };
+  }
 
-function loadYouTube(videoId){stopYouTube();$('ph').style.display='none';videoEl.style.display='none';ytEl.style.display='block';ytEl.src='https://www.youtube.com/embed/'+videoId+'?autoplay=1&rel=0&enablejsapi=1&origin='+encodeURIComponent(location.origin);S.isYouTube=true;toast('&#127916; YouTube загружен!');sendSync({type:'load',url:'yt://'+videoId});}
+  // Get microphone if not already
+  if(!S.ls){
+    try{
+      S.ls=await navigator.mediaDevices.getUserMedia({
+        audio:{
+          echoCancellation:true,
+          noiseSuppression:true,
+          autoGainControl:true
+        }
+      });
+      setupAudio();
+    }catch(e){
+      toast('Разрешите доступ к микрофону');
+      return;
+    }
+  }
 
-function loadVideo(){const url=$('vu').value.trim();if(!url)return;if(url.includes('youtube.com')||url.includes('youtu.be')){const m=url.match(/(?:v=|\/)([A-Za-z0-9_-]{11})/);if(m&&m[1]){loadYouTube(m[1]);return;}else{toast('&#10060; Неверная ссылка YouTube');return;}}
-stopYouTube();videoEl.pause();videoEl.removeAttribute('src');videoEl.load();$('ph').style.display='flex';videoEl.style.display='none';$('pf').style.width='0%';$('pbu').style.width='0%';$('tm').textContent='00:00 / 00:00';videoEl.src=url;videoEl.load();
-const onCanPlay=()=>{$('ph').style.display='none';videoEl.style.display='block';videoEl.muted=false;const vol=parseInt($('vv').textContent)/100;videoEl.volume=vol;videoEl.muted=vol===0;toast('&#127916; Видео готово! Нажмите &#9654;');sendSync({type:'load',url:url});};
-videoEl.addEventListener('canplay',onCanPlay,{once:true});
-videoEl.onerror=()=>{let msg='Ошибка загрузки';if(videoEl.error){switch(videoEl.error.code){case 1:msg='Прервано';break;case 2:msg='Ошибка сети';break;case 3:msg='Формат не поддерживается';break;case 4:msg='Невозможно воспроизвести';break;}}toast('&#10060; '+msg);};
-videoEl.onwaiting=()=>$('buffering').classList.add('show');
-videoEl.onplaying=()=>$('buffering').classList.remove('show');
-videoEl.oncanplaythrough=()=>$('buffering').classList.remove('show');
-videoEl.onprogress=()=>{if(videoEl.buffered.length>0&&videoEl.duration)$('pbu').style.width=(videoEl.buffered.end(videoEl.buffered.length-1)/videoEl.duration*100)+'%';};
-closeAllPanels();}
+  // Add local tracks to peer connection
+  if(S.ls){
+    S.ls.getTracks().forEach(t=>{
+      if(S.pc)S.pc.addTrack(t,S.ls);
+    });
+  }
 
-function togglePlay(){if(S.isYouTube){toast('Управление YouTube через сайт');return;}if(!videoEl.src){toast('Сначала загрузите видео');return;}if(videoEl.paused){videoEl.play().then(()=>{S.isPlaying=true;updatePlayBtn(true);sendSync({type:'play',time:videoEl.currentTime});toast('&#9654; Воспроизведение');}).catch(()=>toast('Нажмите на видео для старта'));}else{videoEl.pause();S.isPlaying=false;updatePlayBtn(false);sendSync({type:'pause',time:videoEl.currentTime});toast('&#9208; Пауза');}}
-function updatePlayBtn(p){$('icon-play').style.display=p?'none':'block';$('icon-pause').style.display=p?'block':'none';}
+  // Handle incoming remote audio tracks
+  S.pc.ontrack=e=>{
+    const stream=e.streams[0];
+    if(!stream)return;
 
-function initProgress(){const bar=$('prog');let dragging=false;function setFromX(cx){if(!videoEl.duration)return;const rect=bar.getBoundingClientRect();let pct=Math.max(0,Math.min(1,(cx-rect.left)/rect.width));$('pf').style.width=(pct*100)+'%';$('pk').style.left=(pct*100)+'%';$('scrub-tip').textContent=fmt(pct*videoEl.duration);$('scrub-tip').style.left=(rect.left+pct*rect.width)+'px';return pct*videoEl.duration;}function onDown(e){e.preventDefault();e.stopPropagation();dragging=true;bar.classList.add('drag');S.isDragging=true;const cx=e.touches?e.touches[0].clientX:e.clientX;setFromX(cx);$('scrub-tip').classList.add('show');}function onMove(e){if(!dragging)return;e.preventDefault();const cx=e.touches?e.touches[0].clientX:e.clientX;setFromX(cx);}function onUp(e){if(!dragging)return;dragging=false;bar.classList.remove('drag');S.isDragging=false;resetHide();$('scrub-tip').classList.remove('show');const cx=e.changedTouches?e.changedTouches[0].clientX:e.clientX;const t=setFromX(cx);if(t!==undefined){videoEl.currentTime=t;sendSync({type:'seek',time:t});}}bar.addEventListener('touchstart',onDown,{passive:false});bar.addEventListener('mousedown',onDown);document.addEventListener('touchmove',onMove,{passive:false});document.addEventListener('mousemove',onMove);document.addEventListener('touchend',onUp);document.addEventListener('mouseup',onUp);}
+    // Create or reuse audio element for remote stream
+    if(!S.remoteAudioEl){
+      S.remoteAudioEl=document.createElement('audio');
+      S.remoteAudioEl.autoplay=true;
+      S.remoteAudioEl.playsInline=true;
+      S.remoteAudioEl.muted=false;
+      S.remoteAudioEl.style.display='none';
+      document.body.appendChild(S.remoteAudioEl);
+    }
 
-function sendSync(d){const msg=JSON.stringify(d);if(S.dc?.readyState==='open')S.dc.send(msg);else if(S.ws?.readyState===1)S.ws.send(JSON.stringify({type:'sync',...d}));}
-function handleSync(m){if(m.stype)applySync({type:m.stype,time:m.time,url:m.url,rate:m.rate});else applySync(m);}
-function applySync(m){if(S.isYouTube)return;if(!videoEl||videoEl.readyState<1)return;switch(m.type){case'play':videoEl.currentTime=m.time;videoEl.play().then(()=>{S.isPlaying=true;updatePlayBtn(true);}).catch(()=>{toast('Собеседник нажал Play!');updatePlayBtn(false);});break;case'pause':videoEl.pause();videoEl.currentTime=m.time;S.isPlaying=false;updatePlayBtn(false);break;case'seek':videoEl.currentTime=m.time;break;case'load':if($('vu').value!==m.url){$('vu').value=m.url;if(m.url.startsWith('yt://')){loadYouTube(m.url.replace('yt://',''));}else{loadVideo();}}break;case'sync':if(m.p&&videoEl.paused)videoEl.play().catch(()=>{});if(Math.abs(videoEl.currentTime-m.time)>.8)videoEl.currentTime=m.time;break;}}
+    S.remoteAudioEl.srcObject=stream;
+    S.remoteAudioEl.play().catch(()=>{});
 
-async function toggleMic(){const b=$('mic-btn');const lbl=$('mic-label');if(!S.ls){try{S.ls=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});setupAudio();if(S.pendingVoiceVol!==undefined&&S.ag)S.ag.gain.value=S.pendingVoiceVol;if(S.pc&&S.ws?.readyState===1)S.ls.getTracks().forEach(t=>S.pc.addTrack(t,S.ls));S.isMicOn=true;if(b){b.style.background='#e50914';b.style.boxShadow='0 0 10px rgba(229,9,20,.3)';}if(lbl)lbl.textContent='Вкл';toast('&#127908; Микрофон вкл');}catch(e){toast('&#10060; Нет доступа');}return;}S.isMicOn=!S.isMicOn;S.ls.getAudioTracks().forEach(t=>t.enabled=S.isMicOn);if(b){b.style.background=S.isMicOn?'#e50914':'rgba(255,255,255,.08)';b.style.boxShadow=S.isMicOn?'0 0 10px rgba(229,9,20,.3)':'none';}if(lbl)lbl.textContent=S.isMicOn?'Вкл':'Выкл';toast(S.isMicOn?'&#127908; Микрофон вкл':'&#128263; Микрофон выкл');}
+    // Set volume from slider
+    S.remoteAudioEl.volume=S.pendingVoiceVol||0.8;
 
-function resetHide(){document.body.classList.remove('ui-hidden');clearTimeout(S.hideTimer);if(S.isPlaying&&!S.isDragging)S.hideTimer=setTimeout(()=>document.body.classList.add('ui-hidden'),4000);}
-function initAutoHide(){['click','touchstart'].forEach(evt=>{document.addEventListener(evt,e=>{if(e.target.closest('.ctrl-btn')||e.target.closest('.panel')||e.target.closest('.prog')||e.target.closest('.range-wrap')||e.target.closest('#peers-panel')||e.target.closest('#peers-toggle')||e.target.closest('#movies-btn')||e.target.closest('#movies-panel'))return;resetHide();},{passive:true});});}
+    // Start voice activity detection
+    setupVoiceDetection(stream);
+  };
 
-async function reqWake(){if(!('wakeLock'in navigator))return;try{S.wakeLock=await navigator.wakeLock.request('screen');S.wakeLock.addEventListener('release',()=>{if(document.visibilityState==='visible')reqWake();});}catch(e){}}document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')reqWake();});
+  S.pc.onicecandidate=e=>{
+    if(e.candidate&&S.ws?.readyState===1){
+      S.ws.send(JSON.stringify({type:'ice-candidate',candidate:e.candidate}));
+    }
+  };
 
-function startLoop(){setInterval(()=>{if(!S.isYouTube&&videoEl&&videoEl.duration){if(!S.isDragging){$('pf').style.width=(videoEl.currentTime/videoEl.duration*100)+'%';$('pk').style.left=(videoEl.currentTime/videoEl.duration*100)+'%';}$('tm').textContent=fmt(videoEl.currentTime)+' / '+fmt(videoEl.duration);if(videoEl.buffered.length>0){const end=videoEl.buffered.end(videoEl.buffered.length-1);$('pbu').style.width=(end/videoEl.duration*100)+'%';}}},200);}
+  S.pc.onconnectionstatechange=()=>{
+    if(S.pc.connectionState==='connected'){
+      toast('&#127908; Голосовой чат активен');
+    }
+    if(S.pc.connectionState==='failed'||S.pc.connectionState==='disconnected'){
+      toast('Соединение разорвано');
+      cleanupRTC();
+    }
+  };
+
+  if(init){
+    const o=await S.pc.createOffer();
+    await S.pc.setLocalDescription(o);
+    S.ws.send(JSON.stringify({type:'offer',sdp:o}));
+  }
+}
+
+// Voice activity detection - shows which peer is talking
+function setupVoiceDetection(stream){
+  if(!window.AudioContext&&!window.webkitAudioContext)return;
+  try{
+    // Use shared audio context or create new one
+    const ctx=S.audioCtx||new(window.AudioContext||window.webkitAudioContext)();
+    const src=ctx.createMediaStreamSource(stream);
+    const analyser=ctx.createAnalyser();
+    analyser.fftSize=256;
+    src.connect(analyser);
+
+    const dataArray=new Uint8Array(analyser.frequencyBinCount);
+
+    // Clear old interval
+    if(S.vadInterval)clearInterval(S.vadInterval);
+
+    S.vadInterval=setInterval(()=>{
+      if(!S.remoteAudioEl)return;
+      analyser.getByteFrequencyData(dataArray);
+      let sum=0;
+      for(let i=0;i<dataArray.length;i++)sum+=dataArray[i];
+      const avg=sum/dataArray.length;
+      const isTalking=avg>12;
+
+      // Update all peers as talking (since we don't know which one in 1:1, it's the only peer)
+      S.peers.forEach(name=>{
+        setPeerTalking(name,isTalking);
+        updatePeerVolume(name,Math.min(avg/128,1));
+      });
+    },100);
+  }catch(e){console.error('VAD error:',e);}
+}
+
+function setupDC(){
+  if(!S.dc)return;
+  if(S.syncTimer)clearInterval(S.syncTimer);
+  S.syncTimer=setInterval(()=>{
+    if(!S.isYouTube&&videoEl&&!videoEl.paused&&videoEl.readyState>=2){
+      sendSync({type:'sync',t:videoEl.currentTime,p:true});
+    }
+  },3000);
+  S.dc.onmessage=e=>{
+    try{applySync(JSON.parse(e.data));}catch(err){}
+  };
+  S.dc.onclose=()=>{
+    if(S.syncTimer){clearInterval(S.syncTimer);S.syncTimer=null;}
+  };
+}
+
+function cleanupRTC(){
+  if(S.syncTimer){clearInterval(S.syncTimer);S.syncTimer=null;}
+  if(S.dc){try{S.dc.close();}catch(e){}S.dc=null;}
+  if(S.pc){
+    S.pc.getSenders().forEach(s=>{
+      if(s.track){try{s.track.stop();}catch(e){}}
+    });
+    S.pc.close();
+    S.pc=null;
+  }
+  // Clean up remote audio
+  removePeerAudio();
+  // Clean up audio context
+  if(S.audioCtx){
+    try{S.audioCtx.close();}catch(e){}
+    S.audioCtx=null;
+  }
+  S.ag=null;
+  S.mg=null;
+}
+
+// Setup audio - only for processing, NOT for local playback (prevents echo)
+function setupAudio(){
+  if(!S.ls||S.audioCtx)return;
+
+  S.audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  if(S.audioCtx.state==='suspended'){
+    S.audioCtx.resume().catch(()=>{});
+  }
+
+  // Create gain node for voice volume control
+  // NOTE: We do NOT connect local mic to destination!
+  // The local stream goes to RTCPeerConnection only.
+  S.ag=S.audioCtx.createGain();
+  S.ag.gain.value=S.pendingVoiceVol||0.8;
+
+  // Resume audio context on user interaction
+  const unlk=()=>{
+    if(S.audioCtx&&S.audioCtx.state==='suspended'){
+      S.audioCtx.resume().catch(()=>{});
+    }
+  };
+  document.addEventListener('click',unlk,{once:true});
+  document.addEventListener('touchstart',unlk,{once:true});
+}
+
+async function handleRTC(m){
+  if(!S.pc)return;
+  try{
+    if(m.type==='offer'){
+      await S.pc.setRemoteDescription(m.sdp);
+      const a=await S.pc.createAnswer();
+      await S.pc.setLocalDescription(a);
+      S.ws.send(JSON.stringify({type:'answer',sdp:a}));
+    }else if(m.type==='answer'){
+      await S.pc.setRemoteDescription(m.sdp);
+    }else if(m.type==='ice-candidate'&&m.candidate){
+      await S.pc.addIceCandidate(m.candidate);
+    }
+  }catch(e){console.error('RTC:',e);}
+}
+
+/* ===== VIDEO LOADING ===== */
+function stopYouTube(){
+  S.isYouTube=false;
+  ytEl.style.display='none';
+  ytEl.src='';
+  videoEl.style.display='none';
+  videoEl.pause();
+}
+
+function loadYouTube(videoId){
+  stopYouTube();
+  $('ph').style.display='none';
+  videoEl.style.display='none';
+  ytEl.style.display='block';
+  ytEl.src='https://www.youtube.com/embed/'+videoId+'?autoplay=1&rel=0&enablejsapi=1&origin='+encodeURIComponent(location.origin);
+  S.isYouTube=true;
+  toast('&#127916; YouTube загружен!');
+  sendSync({type:'load',url:'yt://'+videoId});
+}
+
+function loadVideo(){
+  const url=$('vu').value.trim();
+  if(!url)return;
+
+  if(url.includes('youtube.com')||url.includes('youtu.be')){
+    const m=url.match(/(?:v=|\/)([A-Za-z0-9_-]{11})/);
+    if(m&&m[1]){
+      loadYouTube(m[1]);
+      return;
+    }else{
+      toast('&#10060; Неверная ссылка YouTube');
+      return;
+    }
+  }
+
+  // Stop YouTube before loading regular video
+  stopYouTube();
+
+  videoEl.pause();
+  videoEl.removeAttribute('src');
+  videoEl.load();
+  $('ph').style.display='flex';
+  videoEl.style.display='none';
+  $('pf').style.width='0%';
+  $('pbu').style.width='0%';
+  $('tm').textContent='00:00 / 00:00';
+
+  videoEl.src=url;
+  videoEl.load();
+
+  const onCanPlay=()=>{
+    $('ph').style.display='none';
+    videoEl.style.display='block';
+    videoEl.muted=false;
+    const vol=parseInt($('vv').textContent)/100;
+    videoEl.volume=vol;
+    videoEl.muted=vol===0;
+    toast('&#127916; Видео готово! Нажмите &#9654;');
+    sendSync({type:'load',url:url});
+  };
+
+  videoEl.addEventListener('canplay',onCanPlay,{once:true});
+  videoEl.onerror=()=>{
+    let msg='Ошибка загрузки';
+    if(videoEl.error){
+      switch(videoEl.error.code){
+        case 1:msg='Прервано';break;
+        case 2:msg='Ошибка сети';break;
+        case 3:msg='Формат не поддерживается';break;
+        case 4:msg='Невозможно воспроизвести';break;
+      }
+    }
+    $('buffering').classList.remove('show');
+    toast('&#10060; '+msg);
+  };
+  videoEl.onwaiting=()=>$('buffering').classList.add('show');
+  videoEl.onplaying=()=>$('buffering').classList.remove('show');
+  videoEl.oncanplaythrough=()=>$('buffering').classList.remove('show');
+  videoEl.onstalled=()=>$('buffering').classList.add('show');
+  videoEl.onprogress=()=>{
+    if(videoEl.buffered.length>0&&videoEl.duration){
+      $('pbu').style.width=(videoEl.buffered.end(videoEl.buffered.length-1)/videoEl.duration*100)+'%';
+    }
+  };
+  closeAllPanels();
+}
+
+function togglePlay(){
+  if(S.isYouTube){
+    toast('Управление YouTube через сайт');
+    return;
+  }
+  if(!videoEl.src){
+    toast('Сначала загрузите видео');
+    return;
+  }
+  if(videoEl.paused){
+    videoEl.play().then(()=>{
+      S.isPlaying=true;
+      updatePlayBtn(true);
+      sendSync({type:'play',time:videoEl.currentTime});
+      toast('&#9654; Воспроизведение');
+    }).catch(()=>toast('Нажмите на видео для старта'));
+  }else{
+    videoEl.pause();
+    S.isPlaying=false;
+    updatePlayBtn(false);
+    sendSync({type:'pause',time:videoEl.currentTime});
+    toast('&#9208; Пауза');
+  }
+}
+
+function updatePlayBtn(p){
+  $('icon-play').style.display=p?'none':'block';
+  $('icon-pause').style.display=p?'block':'none';
+}
+
+function initProgress(){
+  const bar=$('prog');
+  let dragging=false;
+  function setFromX(cx){
+    if(!videoEl.duration)return;
+    const rect=bar.getBoundingClientRect();
+    let pct=Math.max(0,Math.min(1,(cx-rect.left)/rect.width));
+    $('pf').style.width=(pct*100)+'%';
+    $('pk').style.left=(pct*100)+'%';
+    $('scrub-tip').textContent=fmt(pct*videoEl.duration);
+    $('scrub-tip').style.left=(rect.left+pct*rect.width)+'px';
+    return pct*videoEl.duration;
+  }
+  function onDown(e){
+    e.preventDefault();
+    e.stopPropagation();
+    dragging=true;
+    bar.classList.add('drag');
+    S.isDragging=true;
+    const cx=e.touches?e.touches[0].clientX:e.clientX;
+    setFromX(cx);
+    $('scrub-tip').classList.add('show');
+  }
+  function onMove(e){
+    if(!dragging)return;
+    e.preventDefault();
+    const cx=e.touches?e.touches[0].clientX:e.clientX;
+    setFromX(cx);
+  }
+  function onUp(e){
+    if(!dragging)return;
+    dragging=false;
+    bar.classList.remove('drag');
+    S.isDragging=false;
+    resetHide();
+    $('scrub-tip').classList.remove('show');
+    const cx=e.changedTouches?e.changedTouches[0].clientX:e.clientX;
+    const t=setFromX(cx);
+    if(t!==undefined){
+      videoEl.currentTime=t;
+      sendSync({type:'seek',time:t});
+    }
+  }
+  bar.addEventListener('touchstart',onDown,{passive:false});
+  bar.addEventListener('mousedown',onDown);
+  document.addEventListener('touchmove',onMove,{passive:false});
+  document.addEventListener('mousemove',onMove);
+  document.addEventListener('touchend',onUp);
+  document.addEventListener('mouseup',onUp);
+}
+
+function sendSync(d){
+  const msg=JSON.stringify(d);
+  if(S.dc?.readyState==='open')S.dc.send(msg);
+  else if(S.ws?.readyState===1)S.ws.send(JSON.stringify({type:'sync',...d}));
+}
+
+function handleSync(m){
+  if(m.stype)applySync({type:m.stype,time:m.time,url:m.url,rate:m.rate});
+  else applySync(m);
+}
+
+function applySync(m){
+  if(S.isYouTube)return;
+  if(!videoEl||videoEl.readyState<1)return;
+  switch(m.type){
+    case 'play':
+      videoEl.currentTime=m.time;
+      videoEl.play().then(()=>{
+        S.isPlaying=true;
+        updatePlayBtn(true);
+      }).catch(()=>{
+        toast('Собеседник нажал Play!');
+        updatePlayBtn(false);
+      });
+      break;
+    case 'pause':
+      videoEl.pause();
+      videoEl.currentTime=m.time;
+      S.isPlaying=false;
+      updatePlayBtn(false);
+      break;
+    case 'seek':
+      videoEl.currentTime=m.time;
+      break;
+    case 'load':
+      if($('vu').value!==m.url){
+        $('vu').value=m.url;
+        if(m.url.startsWith('yt://')){
+          loadYouTube(m.url.replace('yt://',''));
+        }else{
+          loadVideo();
+        }
+      }
+      break;
+    case 'sync':
+      if(m.p&&videoEl.paused)videoEl.play().catch(()=>{});
+      if(Math.abs(videoEl.currentTime-m.time)>.8)videoEl.currentTime=m.time;
+      break;
+  }
+}
+
+// Toggle mic - properly handle track enabling/disabling with class toggle
+async function toggleMic(){
+  const b=$('mic-btn');
+  const lbl=$('mic-label');
+
+  if(!S.ls){
+    try{
+      S.ls=await navigator.mediaDevices.getUserMedia({
+        audio:{
+          echoCancellation:true,
+          noiseSuppression:true,
+          autoGainControl:true
+        }
+      });
+      setupAudio();
+      if(S.pendingVoiceVol!==undefined&&S.ag)S.ag.gain.value=S.pendingVoiceVol;
+
+      // If PC exists, add tracks to it
+      if(S.pc&&S.ws?.readyState===1){
+        S.ls.getTracks().forEach(t=>{
+          const sender=S.pc.getSenders().find(s=>s.track&&s.track.kind==='audio');
+          if(sender){
+            sender.replaceTrack(t);
+          }else{
+            S.pc.addTrack(t,S.ls);
+          }
+        });
+      }
+
+      S.isMicOn=true;
+      if(b){
+        b.classList.add('on');
+        b.style.background='#e50914';
+        b.style.boxShadow='0 0 10px rgba(229,9,20,.3)';
+      }
+      if(lbl)lbl.textContent='Вкл';
+      toast('&#127908; Микрофон вкл');
+    }catch(e){
+      toast('&#10060; Нет доступа');
+    }
+    return;
+  }
+
+  S.isMicOn=!S.isMicOn;
+  S.ls.getAudioTracks().forEach(t=>{
+    t.enabled=S.isMicOn;
+  });
+
+  if(b){
+    if(S.isMicOn){
+      b.classList.add('on');
+      b.style.background='#e50914';
+      b.style.boxShadow='0 0 10px rgba(229,9,20,.3)';
+    }else{
+      b.classList.remove('on');
+      b.style.background='rgba(255,255,255,.08)';
+      b.style.boxShadow='none';
+    }
+  }
+  if(lbl)lbl.textContent=S.isMicOn?'Вкл':'Выкл';
+  toast(S.isMicOn?'&#127908; Микрофон вкл':'&#128263; Микрофон выкл');
+}
+
+function resetHide(){
+  document.body.classList.remove('ui-hidden');
+  clearTimeout(S.hideTimer);
+  if(S.isPlaying&&!S.isDragging){
+    S.hideTimer=setTimeout(()=>document.body.classList.add('ui-hidden'),4000);
+  }
+}
+
+function initAutoHide(){
+  ['click','touchstart'].forEach(evt=>{
+    document.addEventListener(evt,e=>{
+      if(e.target.closest('.ctrl-btn')||
+         e.target.closest('.panel')||
+         e.target.closest('.prog')||
+         e.target.closest('.range-wrap')||
+         e.target.closest('#peers-panel')||
+         e.target.closest('#peers-toggle')||
+         e.target.closest('#movies-btn')||
+         e.target.closest('#movies-panel'))return;
+      resetHide();
+    },{passive:true});
+  });
+}
+
+async function reqWake(){
+  if(!('wakeLock'in navigator))return;
+  try{
+    S.wakeLock=await navigator.wakeLock.request('screen');
+    S.wakeLock.addEventListener('release',()=>{
+      if(document.visibilityState==='visible')reqWake();
+    });
+  }catch(e){}
+}
+
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible')reqWake();
+});
+
+function startLoop(){
+  setInterval(()=>{
+    if(!S.isYouTube&&videoEl&&videoEl.duration){
+      if(!S.isDragging){
+        $('pf').style.width=(videoEl.currentTime/videoEl.duration*100)+'%';
+        $('pk').style.left=(videoEl.currentTime/videoEl.duration*100)+'%';
+      }
+      $('tm').textContent=fmt(videoEl.currentTime)+' / '+fmt(videoEl.duration);
+      if(videoEl.buffered.length>0){
+        const end=videoEl.buffered.end(videoEl.buffered.length-1);
+        $('pbu').style.width=(end/videoEl.duration*100)+'%';
+      }
+    }
+  },200);
+}
 
 /* ===== MOVIES PANEL ===== */
 const TMDB_API_KEY='eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI1NDQwNzBlNTFkNGE0Y2M1YjA4ZjA3MWYzNjMwZjE2YyIsIm5iZiI6MTc4NDM0OTcwNS42NCwic3ViIjoiNmE1YjA0MDkzMmQxNzUwOTU5N2JkMDM0Iiwic2NvcGVzIjpbImFwaV9yZWFkIl0sInZlcnNpb24iOjF9.8Lh2yXZvvkaL5Y9EL_lJPQ-iyh7m7Lu566bTWIKOKPU';
@@ -694,12 +1405,16 @@ async function searchYouTube(q){
     let durations={};
     if(videoIds){
       const dres=await fetch('https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id='+videoIds+'&key='+YT_API_KEY);
-      if(dres.ok){const ddata=await dres.json();(ddata.items||[]).forEach(v=>{durations[v.id]=v.contentDetails?parseDuration(v.contentDetails.duration):'';});}
+      if(dres.ok){
+        const ddata=await dres.json();
+        (ddata.items||[]).forEach(v=>{
+          durations[v.id]=v.contentDetails?parseDuration(v.contentDetails.duration):'';
+        });
+      }
     }
     renderYouTubeResults(data.items||[],durations);
   }catch(e){
     console.error('YouTube error:',e);
-    // Fallback: show search link
     $('movies-list').innerHTML='<div class="empty-movies"><div class="ic">&#127909;</div><div>YouTube API недоступен.<br>Поиск через <a href="https://www.youtube.com/results?search_query='+encodeURIComponent(q)+'" target="_blank" style="color:#e50914">YouTube</a></div></div>';
   }
 }
@@ -742,29 +1457,99 @@ async function searchYouTubeForMovie(q){
 }
 
 function initEvents(){
-$('join-btn').addEventListener('click',()=>{S.myName=$('un').value.trim()||'Я';S.room=$('rc').value.trim().toUpperCase();if(S.room.length!==6){toast('Код — 6 символов');return;}showStatus('Подключение...','wait');connectWS();});
-$('create-btn').addEventListener('click',()=>{S.myName=$('un').value.trim()||'Я';S.room=genCode();S.isHost=true;showStatus('Создание...','wait');connectWS();});
-$('un').addEventListener('keydown',e=>{if(e.key==='Enter')$('rc').focus();});
-$('rc').addEventListener('keydown',e=>{if(e.key==='Enter')$('join-btn').click();});
-$('vu').addEventListener('keydown',e=>{if(e.key==='Enter')loadVideo();});
-$('pb').addEventListener('click',e=>{e.stopPropagation();togglePlay();});
-$('ub').addEventListener('click',e=>{e.stopPropagation();toggleUrlPanel();});
-$('fs-btn').addEventListener('click',e=>{e.stopPropagation();toggleFullscreen();});
-$('load-btn').addEventListener('click',e=>{e.stopPropagation();loadVideo();});
-document.addEventListener('click',e=>{if(!e.target.closest('.panel')&&!e.target.closest('.ctrl-btn')&&!e.target.closest('#peers-panel')&&!e.target.closest('#peers-toggle')&&!e.target.closest('#movies-btn'))closeAllPanels();});
-document.addEventListener('fullscreenchange',updateFullscreenBtn);
-document.addEventListener('webkitfullscreenchange',updateFullscreenBtn);
-document.addEventListener('keydown',e=>{if($('main').classList.contains('hidden'))return;if(e.target.tagName==='INPUT')return;switch(e.code){case'Space':e.preventDefault();togglePlay();break;case'ArrowLeft':if(!S.isYouTube&&videoEl.duration){videoEl.currentTime=Math.max(0,videoEl.currentTime-10);sendSync({type:'seek',time:videoEl.currentTime});}break;case'ArrowRight':if(!S.isYouTube&&videoEl.duration){videoEl.currentTime=Math.min(videoEl.duration,videoEl.currentTime+10);sendSync({type:'seek',time:videoEl.currentTime});}break;case'KeyF':toggleFullscreen();break;}});
-window.addEventListener('beforeunload',()=>{if(S.syncTimer)clearInterval(S.syncTimer);if(S.reconTimer)clearTimeout(S.reconTimer);cleanupRTC();if(S.ls)S.ls.getTracks().forEach(t=>t.stop());if(S.ws)S.ws.close();});
+  $('join-btn').addEventListener('click',()=>{
+    S.myName=$('un').value.trim()||'Я';
+    S.room=$('rc').value.trim().toUpperCase();
+    if(S.room.length!==6){toast('Код — 6 символов');return;}
+    showStatus('Подключение...','wait');
+    connectWS();
+  });
+  $('create-btn').addEventListener('click',()=>{
+    S.myName=$('un').value.trim()||'Я';
+    S.room=genCode();
+    S.isHost=true;
+    showStatus('Создание...','wait');
+    connectWS();
+  });
+  $('un').addEventListener('keydown',e=>{if(e.key==='Enter')$('rc').focus();});
+  $('rc').addEventListener('keydown',e=>{if(e.key==='Enter')$('join-btn').click();});
+  $('vu').addEventListener('keydown',e=>{if(e.key==='Enter')loadVideo();});
+  $('pb').addEventListener('click',e=>{e.stopPropagation();togglePlay();});
+  $('ub').addEventListener('click',e=>{e.stopPropagation();toggleUrlPanel();});
+  $('fs-btn').addEventListener('click',e=>{e.stopPropagation();toggleFullscreen();});
+  $('load-btn').addEventListener('click',e=>{e.stopPropagation();loadVideo();});
+  document.addEventListener('click',e=>{
+    if(!e.target.closest('.panel')&&
+       !e.target.closest('.ctrl-btn')&&
+       !e.target.closest('#peers-panel')&&
+       !e.target.closest('#peers-toggle')&&
+       !e.target.closest('#movies-btn')){
+      closeAllPanels();
+    }
+  });
+  document.addEventListener('fullscreenchange',updateFullscreenBtn);
+  document.addEventListener('webkitfullscreenchange',updateFullscreenBtn);
+  document.addEventListener('keydown',e=>{
+    if($('main').classList.contains('hidden'))return;
+    if(e.target.tagName==='INPUT')return;
+    switch(e.code){
+      case 'Space':
+        e.preventDefault();
+        togglePlay();
+        break;
+      case 'ArrowLeft':
+        if(!S.isYouTube&&videoEl.duration){
+          videoEl.currentTime=Math.max(0,videoEl.currentTime-10);
+          sendSync({type:'seek',time:videoEl.currentTime});
+        }
+        break;
+      case 'ArrowRight':
+        if(!S.isYouTube&&videoEl.duration){
+          videoEl.currentTime=Math.min(videoEl.duration,videoEl.currentTime+10);
+          sendSync({type:'seek',time:videoEl.currentTime});
+        }
+        break;
+      case 'KeyF':
+        toggleFullscreen();
+        break;
+    }
+  });
+  window.addEventListener('beforeunload',()=>{
+    if(S.syncTimer)clearInterval(S.syncTimer);
+    if(S.reconTimer)clearTimeout(S.reconTimer);
+    cleanupRTC();
+    if(S.ls)S.ls.getTracks().forEach(t=>t.stop());
+    if(S.ws)S.ws.close();
+  });
 }
 
 function init(){
+  // Parse room code from URL if present
+  const urlParams=new URLSearchParams(window.location.search);
+  const roomFromUrl=urlParams.get('room');
+  if(roomFromUrl&&roomFromUrl.length===6){
+    $('rc').value=roomFromUrl.toUpperCase();
+  }
+
   const safeTop=Math.max(16,window.screen?.availHeight?Math.round((window.outerHeight-window.innerHeight)/2):0,parseInt(getComputedStyle(document.documentElement).getPropertyValue('--safe-top'))||0);
   document.documentElement.style.setProperty('--safe-top',safeTop+'px');
   const safeBottom=Math.max(16,parseInt(getComputedStyle(document.documentElement).getPropertyValue('--safe-bottom'))||0);
   document.documentElement.style.setProperty('--safe-bottom',safeBottom+'px');
-  $('self-name').textContent=S.myName||'Я';$('self-avatar').textContent=getInitials(S.myName||'Я');videoEl.volume=0.6;initEvents();initProgress();initRanges();initAutoHide();initPeersPanel();initSharePanel();initMoviesPanel();startLoop();reqWake();console.log('CineSync v6.0 initialized');
+  $('self-name').textContent=S.myName||'Я';
+  $('self-avatar').textContent=getInitials(S.myName||'Я');
+  videoEl.volume=0.6;
+  initEvents();
+  initProgress();
+  initRanges();
+  initAutoHide();
+  initPeersPanel();
+  initSharePanel();
+  initMoviesPanel();
+  startLoop();
+  reqWake();
+  console.log('CineSync v6.2 fully fixed initialized');
 }
+
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 </script>
 </body>
