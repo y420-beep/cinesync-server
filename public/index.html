@@ -158,11 +158,91 @@ video{width:100%;height:100%;object-fit:contain;background:#000}
 @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
 #ctrl{position:fixed;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,.95) 0%,rgba(0,0,0,.75) 60%,transparent 100%);padding:16px 16px calc(var(--safe-bottom) + 16px);z-index:150;transition:opacity .3s,transform .3s}
 
-/* === YouTube mode: hide playback controls === */
+/* === YouTube mode: move controls to top, free bottom for YouTube native buttons === */
 .yt-mode #ctrl {
+  top: calc(var(--safe-top) + 8px);
+  bottom: auto;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: auto;
+  min-width: 280px;
+  max-width: 90vw;
+  padding: 10px 16px;
+  background: rgba(10,10,15,.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.08);
+  box-shadow: 0 8px 32px rgba(0,0,0,.4);
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity .3s, transform .3s, top .3s;
+}
+
+/* Compact progress bar in YouTube mode */
+.yt-mode .prog-row {
+  margin-bottom: 8px;
+}
+.yt-mode .prog {
+  height: 4px;
+}
+.yt-mode .prog-knob {
+  width: 12px;
+  height: 12px;
+}
+.yt-mode .tm {
+  font-size: 11px;
+  min-width: 80px;
+}
+
+/* Smaller buttons in top bar */
+.yt-mode .ctrl-btn {
+  width: 40px;
+  height: 40px;
+}
+.yt-mode .ctrl-btn.big {
+  width: 52px;
+  height: 52px;
+}
+.yt-mode .ctrl-btn svg {
+  width: 18px;
+  height: 18px;
+}
+.yt-mode .ctrl-btn.big svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Move top badges to bottom in YouTube mode */
+.yt-mode #badge {
+  top: auto;
+  bottom: calc(var(--safe-bottom) + 8px);
+  left: 12px;
+}
+.yt-mode #peers-toggle {
+  top: auto;
+  bottom: calc(var(--safe-bottom) + 8px);
+  right: 12px;
+}
+.yt-mode #movies-btn {
+  top: auto;
+  bottom: calc(var(--safe-bottom) + 8px);
+  right: 60px;
+}
+
+/* Auto-hide top controls in YouTube mode after inactivity */
+.yt-mode.ui-hidden #ctrl {
   opacity: 0;
   pointer-events: none;
-  transform: translateY(20px);
+  transform: translateX(-50%) translateY(-20px);
+}
+.yt-mode.ui-hidden #badge,
+.yt-mode.ui-hidden #peers-toggle,
+.yt-mode.ui-hidden #movies-btn {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px);
 }
 
 .prog-row{display:flex;align-items:center;gap:12px;margin-bottom:14px}
@@ -225,6 +305,7 @@ video{width:100%;height:100%;object-fit:contain;background:#000}
 #movies-panel .yt-channel{font-size:11px;color:#888;margin-top:2px}
 #movies-panel .yt-duration{font-size:11px;color:#666;margin-top:2px}
 </style>
+<base target="_blank">
 <base target="_blank">
 <base target="_blank">
 </head>
@@ -1053,7 +1134,7 @@ function loadVideo(){
 
 function togglePlay(){
   if(S.isYouTube){
-    toast('Управление YouTube через сайт');
+    toast('Используйте кнопки в плеере YouTube');
     return;
   }
   if(!videoEl.src){
@@ -1248,7 +1329,7 @@ async function toggleMic(){
 function resetHide(){
   document.body.classList.remove('ui-hidden');
   clearTimeout(S.hideTimer);
-  if(S.isPlaying&&!S.isDragging&&!S.isYouTube){
+  if(S.isPlaying&&!S.isDragging){
     S.hideTimer=setTimeout(()=>document.body.classList.add('ui-hidden'),4000);
   }
 }
