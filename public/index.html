@@ -1,3 +1,7 @@
+Ниже — исправленный полный код.
+Добавлен CSS-класс .yt-mode, который скрывает контролы при просмотре YouTube, и внесены правки в функции loadYouTube / stopYouTube.
+
+```html
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -153,6 +157,13 @@ video{width:100%;height:100%;object-fit:contain;background:#000}
 #mic-btn.on svg{fill:#fff}
 @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
 #ctrl{position:fixed;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,.95) 0%,rgba(0,0,0,.75) 60%,transparent 100%);padding:16px 16px calc(var(--safe-bottom) + 16px);z-index:150;transition:opacity .3s,transform .3s}
+
+/* === YouTube mode: hide playback controls === */
+.yt-mode #ctrl {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px);
+}
 
 .prog-row{display:flex;align-items:center;gap:12px;margin-bottom:14px}
 .prog{flex:1;height:5px;background:rgba(255,255,255,.12);border-radius:3px;position:relative;cursor:pointer;touch-action:none}
@@ -653,7 +664,6 @@ function initRanges(){
         $('av').textContent=r+'%';
         S.pendingVoiceVol=pct;
         if(S.ag)S.ag.gain.value=pct;
-        // Also update remote audio volume
         if(S.remoteAudioEl)S.remoteAudioEl.volume=pct;
       }
     }
@@ -716,7 +726,6 @@ function handleMsg(m){
           }
         });
       }
-      // Initialize RTC for ALL participants when there are other peers
       if(m.peers && m.peers.length>1){
         initRTC(S.isHost);
         startCallTimer();
@@ -726,7 +735,6 @@ function handleMsg(m){
     case 'peer-joined':
       toast('&#128100; '+m.name+' подключился');
       addPeerToPanel(m.name);
-      // Start/restart timer when any peer joins
       if(!S.callTimerInterval){
         initRTC(S.isHost);
         startCallTimer();
@@ -752,27 +760,17 @@ function handleMsg(m){
 }
 
 /* ===== WEBRTC - COMPLETELY REWRITTEN ===== */
-// This app uses a single RTCPeerConnection per room (1:1 or simple mesh via server)
-// Key fixes:
-// 1. No local audio playback (prevents echo)
-// 2. Single remote audio element tracked properly
-// 3. AudioContext cleanup on disconnect
-// 4. Voice activity detection using shared analyser
-
 function removePeerAudio(){
-  // Clean up remote audio element
   if(S.remoteAudioEl){
     S.remoteAudioEl.pause();
     S.remoteAudioEl.srcObject=null;
     if(S.remoteAudioEl.parentNode)S.remoteAudioEl.parentNode.removeChild(S.remoteAudioEl);
     S.remoteAudioEl=null;
   }
-  // Stop VAD
   if(S.vadInterval){
     clearInterval(S.vadInterval);
     S.vadInterval=null;
   }
-  // Reset all peer talking states
   S.peers.forEach(name=>setPeerTalking(name,false));
 }
 
@@ -798,7 +796,6 @@ async function initRTC(init){
     };
   }
 
-  // Get microphone if not already
   if(!S.ls){
     try{
       S.ls=await navigator.mediaDevices.getUserMedia({
@@ -815,19 +812,16 @@ async function initRTC(init){
     }
   }
 
-  // Add local tracks to peer connection
   if(S.ls){
     S.ls.getTracks().forEach(t=>{
       if(S.pc)S.pc.addTrack(t,S.ls);
     });
   }
 
-  // Handle incoming remote audio tracks
   S.pc.ontrack=e=>{
     const stream=e.streams[0];
     if(!stream)return;
 
-    // Create or reuse audio element for remote stream
     if(!S.remoteAudioEl){
       S.remoteAudioEl=document.createElement('audio');
       S.remoteAudioEl.autoplay=true;
@@ -840,10 +834,8 @@ async function initRTC(init){
     S.remoteAudioEl.srcObject=stream;
     S.remoteAudioEl.play().catch(()=>{});
 
-    // Set volume from slider
     S.remoteAudioEl.volume=S.pendingVoiceVol||0.8;
 
-    // Start voice activity detection
     setupVoiceDetection(stream);
   };
 
@@ -870,11 +862,9 @@ async function initRTC(init){
   }
 }
 
-// Voice activity detection - shows which peer is talking
 function setupVoiceDetection(stream){
   if(!window.AudioContext&&!window.webkitAudioContext)return;
   try{
-    // Use shared audio context or create new one
     const ctx=S.audioCtx||new(window.AudioContext||window.webkitAudioContext)();
     const src=ctx.createMediaStreamSource(stream);
     const analyser=ctx.createAnalyser();
@@ -883,7 +873,6 @@ function setupVoiceDetection(stream){
 
     const dataArray=new Uint8Array(analyser.frequencyBinCount);
 
-    // Clear old interval
     if(S.vadInterval)clearInterval(S.vadInterval);
 
     S.vadInterval=setInterval(()=>{
@@ -894,7 +883,6 @@ function setupVoiceDetection(stream){
       const avg=sum/dataArray.length;
       const isTalking=avg>12;
 
-      // Update all peers as talking (since we don't know which one in 1:1, it's the only peer)
       S.peers.forEach(name=>{
         setPeerTalking(name,isTalking);
         updatePeerVolume(name,Math.min(avg/128,1));
@@ -929,9 +917,7 @@ function cleanupRTC(){
     S.pc.close();
     S.pc=null;
   }
-  // Clean up remote audio
   removePeerAudio();
-  // Clean up audio context
   if(S.audioCtx){
     try{S.audioCtx.close();}catch(e){}
     S.audioCtx=null;
@@ -940,7 +926,6 @@ function cleanupRTC(){
   S.mg=null;
 }
 
-// Setup audio - only for processing, NOT for local playback (prevents echo)
 function setupAudio(){
   if(!S.ls||S.audioCtx)return;
 
@@ -949,13 +934,9 @@ function setupAudio(){
     S.audioCtx.resume().catch(()=>{});
   }
 
-  // Create gain node for voice volume control
-  // NOTE: We do NOT connect local mic to destination!
-  // The local stream goes to RTCPeerConnection only.
   S.ag=S.audioCtx.createGain();
   S.ag.gain.value=S.pendingVoiceVol||0.8;
 
-  // Resume audio context on user interaction
   const unlk=()=>{
     if(S.audioCtx&&S.audioCtx.state==='suspended'){
       S.audioCtx.resume().catch(()=>{});
@@ -988,6 +969,7 @@ function stopYouTube(){
   ytEl.src='';
   videoEl.style.display='none';
   videoEl.pause();
+  document.body.classList.remove('yt-mode');   // <-- возвращаем контролы
 }
 
 function loadYouTube(videoId){
@@ -997,6 +979,8 @@ function loadYouTube(videoId){
   ytEl.style.display='block';
   ytEl.src='https://www.youtube.com/embed/'+videoId+'?autoplay=1&rel=0&enablejsapi=1&origin='+encodeURIComponent(location.origin);
   S.isYouTube=true;
+  document.body.classList.add('yt-mode');       // <-- скрываем контролы
+  clearTimeout(S.hideTimer);
   toast('&#127916; YouTube загружен!');
   sendSync({type:'load',url:'yt://'+videoId});
 }
@@ -1016,7 +1000,6 @@ function loadVideo(){
     }
   }
 
-  // Stop YouTube before loading regular video
   stopYouTube();
 
   videoEl.pause();
@@ -1217,7 +1200,6 @@ async function toggleMic(){
       setupAudio();
       if(S.pendingVoiceVol!==undefined&&S.ag)S.ag.gain.value=S.pendingVoiceVol;
 
-      // If PC exists, add tracks to it
       if(S.pc&&S.ws?.readyState===1){
         S.ls.getTracks().forEach(t=>{
           const sender=S.pc.getSenders().find(s=>s.track&&s.track.kind==='audio');
@@ -1266,7 +1248,7 @@ async function toggleMic(){
 function resetHide(){
   document.body.classList.remove('ui-hidden');
   clearTimeout(S.hideTimer);
-  if(S.isPlaying&&!S.isDragging){
+  if(S.isPlaying&&!S.isDragging&&!S.isYouTube){
     S.hideTimer=setTimeout(()=>document.body.classList.add('ui-hidden'),4000);
   }
 }
@@ -1524,7 +1506,6 @@ function initEvents(){
 }
 
 function init(){
-  // Parse room code from URL if present
   const urlParams=new URLSearchParams(window.location.search);
   const roomFromUrl=urlParams.get('room');
   if(roomFromUrl&&roomFromUrl.length===6){
@@ -1554,3 +1535,4 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 </script>
 </body>
 </html>
+```
