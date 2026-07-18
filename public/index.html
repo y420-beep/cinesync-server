@@ -215,6 +215,7 @@ video{width:100%;height:100%;object-fit:contain;background:#000}
 #movies-panel .yt-duration{font-size:11px;color:#666;margin-top:2px}
 </style>
 <base target="_blank">
+<base target="_blank">
 </head>
 <body>
 
@@ -606,9 +607,9 @@ async function reqWake(){if(!('wakeLock'in navigator))return;try{S.wakeLock=awai
 function startLoop(){setInterval(()=>{if(!S.isYouTube&&videoEl&&videoEl.duration){if(!S.isDragging){$('pf').style.width=(videoEl.currentTime/videoEl.duration*100)+'%';$('pk').style.left=(videoEl.currentTime/videoEl.duration*100)+'%';}$('tm').textContent=fmt(videoEl.currentTime)+' / '+fmt(videoEl.duration);if(videoEl.buffered.length>0){const end=videoEl.buffered.end(videoEl.buffered.length-1);$('pbu').style.width=(end/videoEl.duration*100)+'%';}}},200);}
 
 /* ===== MOVIES PANEL ===== */
-const TMDB_API_KEY='eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI5NjY1ZjA2YjY2ZjQ2ZGQ0ZTE2Yzk4ZjE1ZjM0MDk5MCIsIm5iZiI6MTc1MjY5NjY4Mi4wMjEsInN1YiI6IjY4OGU1ZjBhYzJhMTYwN2E1Y2Q3OWU1MiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.f3vQ3-9x4x5x6x7x8x9x0x1x2x3x4x5x6x7x8x9x0';
+const TMDB_API_KEY='eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI1NDQwNzBlNTFkNGE0Y2M1YjA4ZjA3MWYzNjMwZjE2YyIsIm5iZiI6MTc4NDM0OTcwNS42NCwic3ViIjoiNmE1YjA0MDkzMmQxNzUwOTU5N2JkMDM0Iiwic2NvcGVzIjpbImFwaV9yZWFkIl0sInZlcnNpb24iOjF9.8Lh2yXZvvkaL5Y9EL_lJPQ-iyh7m7Lu566bTWIKOKPU';
 const TMDB_BASE='https://api.themoviedb.org/3';
-const YT_API_KEY='AIzaSyD-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
+const YT_API_KEY='AIzaSyB-O42cdE6ZNllR6XeIZyc0XWnqtm-dPoM';
 
 function initMoviesPanel(){
   $('movies-btn').addEventListener('click',e=>{e.stopPropagation();toggleMoviesPanel();});
