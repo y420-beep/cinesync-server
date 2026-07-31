@@ -11,94 +11,77 @@ const LIVEKIT_URL = process.env.LIVEKIT_URL || 'wss://webrtc-if6vxkit.livekit.cl
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'APIFReDGuTuWGSa';
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || 'UUX8aBQSAVFdxqgi9ufeX036UyEjPTcfvTRyEnuuoGdA';
 
-// Раздаём статику (HTML, CSS, JS)
+// Статика
 app.use(express.static(path.join(__dirname, 'public')));
 
-const server = app.listen(port, () => {
-  console.log(`Сервер запущен на порту ${port}`);
+// Создаём HTTP сервер
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log(`✅ Сервер запущен на порту ${port}`);
 });
 
-// WebSocket сервер для сигнализации
+// Обработка ошибок сервера
+server.on('error', (err) => {
+  console.error('❌ Ошибка HTTP:', err);
+});
+
+// WebSocket сервер
 const wss = new WebSocket.Server({ server, path: '/ws' });
 
-// Хранилище комнат: roomId -> Set(участников)
 const rooms = new Map();
-// Хранилище соответствия WebSocket -> комната/имя
-const clients = new Map(); // ws -> { room, name }
+const clients = new Map();
 
-// Генерация токена LiveKit
-function generateToken(room, participantName) {
-  const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
-    identity: participantName,
-    name: participantName,
-  });
-  at.addGrant({ roomJoin: true, room });
-  return at.toJwt();
+function generateToken(room, participant) {
+  try {
+    const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+      identity: participant,
+      name: participant,
+    });
+    at.addGrant({ roomJoin: true, room });
+    return at.toJwt();
+  } catch (err) {
+    console.error('Ошибка генерации токена:', err);
+    return null;
+  }
 }
 
 wss.on('connection', (ws) => {
   let currentRoom = null;
   let currentName = null;
 
-  ws.on('message', async (message) => {
+  ws.on('message', (message) => {
     try {
       const data = JSON.parse(message);
+      console.log('📨 Получено:', data.type);
 
-      switch (data.type) {
-        case 'join': {
-          const { room, name } = data;
-          currentRoom = room;
-          currentName = name;
+      if (data.type === 'join') {
+        const { room, name } = data;
+        currentRoom = room;
+        currentName = name;
 
-          // Сохраняем клиента
-          clients.set(ws, { room, name });
+        clients.set(ws, { room, name });
 
-          // Добавляем в комнату
-          if (!rooms.has(room)) rooms.set(room, new Set());
-          const participants = rooms.get(room);
-          participants.add(name);
+        if (!rooms.has(room)) rooms.set(room, new Set());
+        const participants = rooms.get(room);
+        participants.add(name);
 
-          // Отправляем новому участнику список уже присутствующих
-          const peers = Array.from(participants).filter(p => p !== name);
-          ws.send(JSON.stringify({
-            type: 'joined',
-            room,
-            peers,
-          }));
+        const peers = Array.from(participants).filter(p => p !== name);
+        ws.send(JSON.stringify({ type: 'joined', room, peers }));
 
-          // Генерируем и отправляем токен LiveKit
-          const token = generateToken(room, name);
-          ws.send(JSON.stringify({
-            type: 'livekit-token',
-            token,
-          }));
-
-          // Уведомляем всех остальных о новом участнике
-          broadcast(room, name, {
-            type: 'peer-joined',
-            name,
-          });
-
-          break;
+        const token = generateToken(room, name);
+        if (token) {
+          ws.send(JSON.stringify({ type: 'livekit-token', token }));
+        } else {
+          ws.send(JSON.stringify({ type: 'error', message: 'Token generation failed' }));
         }
 
-        case 'sync':
-          // Пересылаем синхронизацию всем в комнате, кроме отправителя
-          broadcast(currentRoom, currentName, data);
-          break;
-
-        // Старые типы WebRTC (игнорируем)
-        case 'offer':
-        case 'answer':
-        case 'ice-candidate':
-          // Можно просто проигнорировать
-          break;
-
-        default:
-          console.warn('Неизвестный тип сообщения:', data.type);
+        broadcast(room, name, { type: 'peer-joined', name });
+      } else if (data.type === 'sync') {
+        broadcast(currentRoom, currentName, data);
+      } else {
+        console.warn('Неизвестный тип:', data.type);
       }
     } catch (err) {
-      console.error('Ошибка обработки сообщения WebSocket:', err);
+      console.error('Ошибка обработки сообщения:', err);
     }
   });
 
@@ -110,18 +93,16 @@ wss.on('connection', (ws) => {
         if (participants.size === 0) {
           rooms.delete(currentRoom);
         } else {
-          broadcast(currentRoom, currentName, {
-            type: 'peer-left',
-            name: currentName,
-          });
+          broadcast(currentRoom, currentName, { type: 'peer-left', name: currentName });
         }
       }
       clients.delete(ws);
     }
   });
+
+  ws.on('error', (err) => console.error('WebSocket ошибка:', err));
 });
 
-// Функция широковещательной рассылки (исключая отправителя)
 function broadcast(room, sender, message) {
   const participants = rooms.get(room);
   if (!participants) return;
@@ -132,3 +113,14 @@ function broadcast(room, sender, message) {
     }
   }
 }
+
+// Глобальный перехват ошибок, чтобы сервер не падал
+process.on('uncaughtException', (err) => {
+  console.error('💥 Неперехваченное исключение:', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('💥 Необработанное отклонение:', reason);
+});
+
+console.log('🚀 Сервер инициализирован');
