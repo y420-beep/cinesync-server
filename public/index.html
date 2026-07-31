@@ -396,9 +396,7 @@ video{width:100%;height:100%;object-fit:contain;background:#000}
 <script>
 'use strict';
 
-// ========== КОНФИГУРАЦИЯ ==========
-const LIVEKIT_URL = 'wss://webrtc-if6vxkit.livekit.cloud'; // можно не менять
-// =================================
+const LIVEKIT_URL = 'wss://webrtc-if6vxkit.livekit.cloud';
 
 const S = {
   ws: null,
@@ -422,47 +420,42 @@ const S = {
   lkRoom: null,
   localAudioTrack: null,
   remoteAudioElements: new Map(),
-  livekitToken: null, // будет получен от сервера
+  livekitToken: null,
   voiceInitialized: false,
 };
+
 const $ = id => document.getElementById(id);
 const videoEl = $('vid');
 const ytEl = $('yt-player');
 const WS_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
 
-// ========== УТИЛИТЫ ==========
+// ---------- Утилиты ----------
 function genCode(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';return Array.from({length:6},()=>c[Math.floor(Math.random()*c.length)]).join('');}
 function fmt(s){if(!isFinite(s))return'00:00';const m=Math.floor(s/60),sec=Math.floor(s%60);return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');}
 function toast(msg){const c=$('toast-c');while(c.children.length>2)c.removeChild(c.firstChild);const t=document.createElement('div');t.className='toast';t.textContent=msg;c.appendChild(t);setTimeout(()=>{t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(()=>t.remove(),300);},2700);}
 function showStatus(t,cls){const s=$('st');s.textContent=t;s.className='status status-'+cls;s.classList.add('show');if(cls==='ok')setTimeout(()=>s.classList.remove('show'),2500);}
 function esc(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
 
-// ========== СПЛЕШ ==========
+// ---------- Сплеш ----------
 (function initStarField(){
   const canvas=$('star-canvas');
   if(!canvas)return;
   const ctx=canvas.getContext('2d');
-  let stars=[];
-  let w,h;
+  let stars=[], w,h;
   function resize(){w=canvas.width=window.innerWidth;h=canvas.height=window.innerHeight;}
-  resize();
-  window.addEventListener('resize',resize);
+  resize(); window.addEventListener('resize',resize);
   class Star{
     constructor(){this.reset();}
     reset(){
-      this.x=Math.random()*w;
-      this.y=Math.random()*h;
+      this.x=Math.random()*w; this.y=Math.random()*h;
       this.size=Math.random()*1.5+.5;
-      this.speedX=(Math.random()-.5)*.3;
-      this.speedY=(Math.random()-.5)*.3;
-      this.opacity=Math.random();
-      this.fadeDir=Math.random()>.5?1:-1;
+      this.speedX=(Math.random()-.5)*.3; this.speedY=(Math.random()-.5)*.3;
+      this.opacity=Math.random(); this.fadeDir=Math.random()>.5?1:-1;
       this.fadeSpeed=Math.random()*.008+.003;
       this.color=Math.random()>.7?'#e50914':(Math.random()>.5?'#ff4757':'#ffffff');
     }
     update(){
-      this.x+=this.speedX;
-      this.y+=this.speedY;
+      this.x+=this.speedX; this.y+=this.speedY;
       this.opacity+=this.fadeSpeed*this.fadeDir;
       if(this.opacity>=1||this.opacity<=.2)this.fadeDir*=-1;
       if(this.x<0||this.x>w||this.y<0||this.y>h)this.reset();
@@ -470,14 +463,10 @@ function esc(t){const d=document.createElement('div');d.textContent=t;return d.i
     draw(){
       ctx.globalAlpha=this.opacity;
       ctx.fillStyle=this.color;
-      ctx.beginPath();
-      ctx.arc(this.x,this.y,this.size,0,Math.PI*2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(this.x,this.y,this.size,0,Math.PI*2); ctx.fill();
       if(this.size>1.2){
         ctx.globalAlpha=this.opacity*.3;
-        ctx.beginPath();
-        ctx.arc(this.x,this.y,this.size*3,0,Math.PI*2);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(this.x,this.y,this.size*3,0,Math.PI*2); ctx.fill();
       }
     }
   }
@@ -486,18 +475,13 @@ function esc(t){const d=document.createElement('div');d.textContent=t;return d.i
   function loop(){
     ctx.clearRect(0,0,w,h);
     const grad=ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,Math.max(w,h));
-    grad.addColorStop(0,'rgba(229,9,20,.03)');
-    grad.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=grad;
-    ctx.fillRect(0,0,w,h);
+    grad.addColorStop(0,'rgba(229,9,20,.03)'); grad.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=grad; ctx.fillRect(0,0,w,h);
     stars.forEach(s=>{s.update();s.draw();});
     animId=requestAnimationFrame(loop);
   }
   loop();
-  window.addEventListener('splashDone',()=>{
-    cancelAnimationFrame(animId);
-    canvas.style.display='none';
-  });
+  window.addEventListener('splashDone',()=>{cancelAnimationFrame(animId); canvas.style.display='none';});
 })();
 
 (function initSplash(){
@@ -515,7 +499,7 @@ function esc(t){const d=document.createElement('div');d.textContent=t;return d.i
   splash.addEventListener('touchstart',function(e){e.preventDefault();dismissSplash();},{passive:false});
 })();
 
-// ========== ПАНЕЛИ И УЧАСТНИКИ ==========
+// ---------- Панели и участники ----------
 function closeAllPanels(){$('url-panel').classList.remove('active');$('movies-panel').classList.remove('active');}
 function toggleUrlPanel(){const p=$('url-panel');const was=p.classList.contains('active');closeAllPanels();if(!was)p.classList.add('active');}
 function toggleMoviesPanel(){const p=$('movies-panel');const was=p.classList.contains('active');closeAllPanels();if(!was)p.classList.add('active');}
@@ -570,10 +554,7 @@ function startCallTimer(){
   },1000);
 }
 function stopCallTimer(){
-  if(S.callTimerInterval){
-    clearInterval(S.callTimerInterval);
-    S.callTimerInterval=null;
-  }
+  if(S.callTimerInterval){clearInterval(S.callTimerInterval);S.callTimerInterval=null;}
   S.callStartTime=null;
   const el=$('call-timer');
   if(el)el.textContent='00:00';
@@ -587,8 +568,7 @@ function initPeersPanel(){
   $('peers-toggle').addEventListener('click',e=>{e.stopPropagation();togglePeersPanel();});
   $('peers-close').addEventListener('click',e=>{e.stopPropagation();closePeersPanel();});
   $('peers-overlay').addEventListener('click',closePeersPanel);
-  const micBtn=$('mic-btn');
-  if(micBtn)micBtn.addEventListener('click',e=>{e.stopPropagation();toggleMic();});
+  // Кнопка микрофона привязана отдельно в init
   const volBtn=$('vol-btn');
   if(volBtn)volBtn.addEventListener('click',e=>{e.stopPropagation();togglePeerVolPanel();});
   let touchStartX=0;
@@ -673,15 +653,24 @@ function initRanges(){
   });
 }
 
-// ========== ГОЛОС (LIVEKIT) ==========
+// ---------- ГОЛОС (LIVEKIT) ----------
 async function initVoice() {
-  if (S.lkRoom) return;
-  if (!S.livekitToken) {
-    console.warn('Нет токена, ждём...');
+  if (S.lkRoom) {
+    console.log('🔊 Голос уже инициализирован');
     return;
   }
-  if (S.voiceInitialized) return;
+  if (!S.livekitToken) {
+    console.warn('⏳ Нет токена, ждём...');
+    toast('⏳ Ожидание токена...');
+    return;
+  }
+  if (S.voiceInitialized) {
+    console.log('⚠️ Голос уже инициализируется');
+    return;
+  }
   S.voiceInitialized = true;
+
+  console.log('🔧 Инициализация голоса с токеном:', S.livekitToken.substring(0, 20) + '...');
 
   const room = new Livekit.Room();
   S.lkRoom = room;
@@ -691,7 +680,6 @@ async function initVoice() {
     console.log('✅ Подключено к LiveKit');
     toast('🎤 Голосовой чат активен');
 
-    // Автоматически включаем микрофон
     await enableMicrophone();
 
     room.on('trackSubscribed', (track, publication, participant) => {
@@ -704,7 +692,6 @@ async function initVoice() {
         document.body.appendChild(audioEl);
         track.attach(audioEl);
         S.remoteAudioElements.set(participant.identity, audioEl);
-
         if (!S.peers.has(participant.identity)) {
           addPeerToPanel(participant.identity);
         }
@@ -746,8 +733,9 @@ async function initVoice() {
     });
 
     startCallTimer();
+    S.voiceInitialized = true;
   } catch (e) {
-    console.error('Ошибка подключения к LiveKit:', e);
+    console.error('❌ Ошибка подключения к LiveKit:', e);
     toast('❌ Не удалось подключиться к голосовому серверу');
     S.lkRoom = null;
     S.voiceInitialized = false;
@@ -755,10 +743,17 @@ async function initVoice() {
 }
 
 async function enableMicrophone() {
-  if (!S.lkRoom) return;
-  if (S.localAudioTrack) return;
+  if (!S.lkRoom) {
+    console.warn('Нет комнаты LiveKit');
+    return;
+  }
+  if (S.localAudioTrack) {
+    console.log('Микрофон уже включён');
+    return;
+  }
 
   try {
+    console.log('🎤 Запрашиваем микрофон...');
     const track = await Livekit.LocalAudioTrack.create({
       deviceId: 'default',
       echoCancellation: true,
@@ -767,6 +762,7 @@ async function enableMicrophone() {
     });
     S.localAudioTrack = track;
     await S.lkRoom.localParticipant.publishTrack(track);
+    console.log('✅ Микрофон опубликован');
 
     const b = document.getElementById('mic-btn');
     if (b) {
@@ -776,9 +772,10 @@ async function enableMicrophone() {
       document.getElementById('mic-label').textContent = 'Вкл';
     }
     S.isMicOn = true;
+    toast('🎤 Микрофон включён');
   } catch (e) {
-    console.error('Ошибка включения микрофона:', e);
-    toast('❌ Не удалось включить микрофон');
+    console.error('❌ Ошибка включения микрофона:', e);
+    toast('❌ Не удалось включить микрофон: ' + e.message);
     throw e;
   }
 }
@@ -801,23 +798,29 @@ async function disableMicrophone() {
     b.style.boxShadow = 'none';
     document.getElementById('mic-label').textContent = 'Выкл';
   }
+  toast('🎤 Микрофон выключен');
 }
 
 async function toggleMic() {
+  console.log('🔘 toggleMic() вызвана');
   if (!S.lkRoom) {
+    console.log('🔘 Нет комнаты, пробуем инициализировать');
     if (!S.livekitToken) {
       toast('⏳ Ожидание токена...');
+      console.warn('Нет токена, запрос на сервер...');
       return;
     }
     await initVoice();
+    if (!S.isMicOn && S.lkRoom) {
+      await enableMicrophone();
+    }
     return;
   }
+
   if (S.isMicOn) {
     await disableMicrophone();
-    toast('🎤 Микрофон выкл');
   } else {
     await enableMicrophone();
-    toast('🎤 Микрофон вкл');
   }
 }
 
@@ -843,7 +846,7 @@ async function cleanupVoice() {
   }
 }
 
-// ========== ВИДЕО И СИНХРОНИЗАЦИЯ ==========
+// ---------- ВИДЕО И СИНХРОНИЗАЦИЯ ----------
 function stopYouTube(){
   S.isYouTube=false;
   ytEl.style.display='none';
@@ -953,8 +956,7 @@ function initProgress(){
     return pct*videoEl.duration;
   }
   function onDown(e){
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
     dragging=true;
     bar.classList.add('drag');
     S.isDragging=true;
@@ -1072,7 +1074,7 @@ function startLoop(){
   },200);
 }
 
-// ========== ПОИСК ФИЛЬМОВ ==========
+// ---------- ПОИСК ФИЛЬМОВ ----------
 const TMDB_API_KEY='eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI1NDQwNzBlNTFkNGE0Y2M1YjA4ZjA3MWYzNjMwZjE2YyIsIm5iZiI6MTc4NDM0OTcwNS42NCwic3ViIjoiNmE1YjA0MDkzMmQxNzUwOTU5N2JkMDM0Iiwic2NvcGVzIjpbImFwaV9yZWFkIl0sInZlcnNpb24iOjF9.8Lh2yXZvvkaL5Y9EL_lJPQ-iyh7m7Lu566bTWIKOKPU';
 const TMDB_BASE='https://api.themoviedb.org/3';
 const YT_API_KEY='AIzaSyB-O42cdE6ZNllR6XeIZyc0XWnqtm-dPoM';
@@ -1198,7 +1200,7 @@ async function searchYouTubeForMovie(q){
   await searchYouTube(q);
 }
 
-// ========== WEBSOCKET ==========
+// ---------- WEBSOCKET ----------
 function connectWS(){
   if(S.ws){try{S.ws.close();}catch(e){}}
   S.ws=new WebSocket(WS_URL);
@@ -1228,9 +1230,9 @@ function scheduleRecon(){
   S.reconTimer=setTimeout(()=>{connectWS();cleanupVoice();},d);
 }
 
-// ========== ОБРАБОТЧИК СООБЩЕНИЙ ==========
+// ---------- ОБРАБОТЧИК СООБЩЕНИЙ ----------
 function handleMsg(m){
-  console.log('📨 Получено сообщение:', m);
+  console.log('📨 Получено:', m.type);
   switch(m.type){
     case 'joined':
       $('connect').classList.add('hidden');
@@ -1247,29 +1249,18 @@ function handleMsg(m){
           }
         });
       }
-      // Если есть другие участники, инициируем голос (но ждём токен)
-      if(m.peers && m.peers.length>0){
-        // Токен придёт отдельным сообщением
-      }
       toast(S.isHost?'Комната: '+S.room:'Подключено!');
       break;
 
     case 'livekit-token':
       S.livekitToken = m.token;
       console.log('🔑 Получен токен LiveKit');
-      // Если есть участники, инициируем голос
-      if (S.peers.size > 0) {
-        initVoice();
-      }
       break;
 
     case 'peer-joined':
       toast('👤 '+m.name+' подключился');
       addPeerToPanel(m.name);
       if (!S.callTimerInterval) {
-        if (!S.lkRoom && S.livekitToken) {
-          initVoice();
-        }
         startCallTimer();
       }
       break;
@@ -1294,7 +1285,7 @@ function handleMsg(m){
   }
 }
 
-// ========== СОБЫТИЯ ==========
+// ---------- СОБЫТИЯ ----------
 function initEvents(){
   $('join-btn').addEventListener('click',()=>{
     S.myName=$('un').value.trim()||'Я';
@@ -1361,20 +1352,36 @@ function initEvents(){
   });
 }
 
+// ---------- ИНИЦИАЛИЗАЦИЯ ----------
 function init(){
-  const urlParams=new URLSearchParams(window.location.search);
-  const roomFromUrl=urlParams.get('room');
-  if(roomFromUrl&&roomFromUrl.length===6){
-    $('rc').value=roomFromUrl.toUpperCase();
+  console.log('🚀 CineSync загружен');
+
+  // Привязываем кнопку микрофона отдельно
+  const micBtn = document.getElementById('mic-btn');
+  if (micBtn) {
+    micBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      console.log('🖱️ Клик по микрофону');
+      toggleMic();
+    });
+    console.log('✅ Кнопка микрофона привязана');
+  } else {
+    console.error('❌ Кнопка микрофона не найдена!');
   }
 
-  const safeTop=Math.max(16,window.screen?.availHeight?Math.round((window.outerHeight-window.innerHeight)/2):0,parseInt(getComputedStyle(document.documentElement).getPropertyValue('--safe-top'))||0);
-  document.documentElement.style.setProperty('--safe-top',safeTop+'px');
-  const safeBottom=Math.max(16,parseInt(getComputedStyle(document.documentElement).getPropertyValue('--safe-bottom'))||0);
-  document.documentElement.style.setProperty('--safe-bottom',safeBottom+'px');
-  $('self-name').textContent=S.myName||'Я';
-  $('self-avatar').textContent=getInitials(S.myName||'Я');
-  videoEl.volume=0.6;
+  // Параметры безопасной зоны
+  const safeTop = Math.max(16, window.screen?.availHeight ? Math.round((window.outerHeight - window.innerHeight)/2) : 0,
+    parseInt(getComputedStyle(document.documentElement).getPropertyValue('--safe-top')) || 0);
+  document.documentElement.style.setProperty('--safe-top', safeTop + 'px');
+  const safeBottom = Math.max(16, parseInt(getComputedStyle(document.documentElement).getPropertyValue('--safe-bottom')) || 0);
+  document.documentElement.style.setProperty('--safe-bottom', safeBottom + 'px');
+
+  // Заполняем себя в списке
+  $('self-name').textContent = S.myName || 'Я';
+  $('self-avatar').textContent = getInitials(S.myName || 'Я');
+  videoEl.volume = 0.6;
+
+  // Остальные инициализации
   initEvents();
   initProgress();
   initRanges();
@@ -1384,10 +1391,15 @@ function init(){
   initMoviesPanel();
   startLoop();
   reqWake();
-  console.log('🚀 CineSync загружен');
+
+  console.log('✅ Все инициализации завершены');
 }
 
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
 </script>
 </body>
 </html>
